@@ -25,6 +25,7 @@ practiceMenus/{日付}                     練習メニュー
   └ attendance/{メールアドレス}          競技場の日の参加
 practiceOptions/main                     メニューの選択肢
 settings/fees                            競技場代の料金
+settings/winter                          冬季料金のオン／オフ
 settings/sheets                          振り返りのスプレッドシート
 records/{自動ID}                         大会記録
 meets/{自動ID}                           大会情報
@@ -38,7 +39,7 @@ pushTokens/{自動ID}                      スマホ通知の宛先
 
 | コレクション | 使い始める Step |
 | --- | --- |
-| members・practiceMenus・attendance・practiceOptions・settings/fees | Step 1 |
+| members・practiceMenus・attendance・practiceOptions・settings/fees・settings/winter | Step 1 |
 | records | Step 2 |
 | meets・entries | Step 3 |
 | reflections・goals・settings/sheets | Step 4 |
@@ -110,7 +111,6 @@ personalBests の 1 件
 | items | 一覧 | 下の表 | メニュー（上から順番に並ぶ。「専門」も 1 つの練習として入る） |
 | note | 文字列 | スパイク持参 | 連絡事項（自由に書く） |
 | isStadium | 真偽値 | true | 競技場の日か（場所で「競技場」を選ぶと自動で true） |
-| isWinterRate | 真偽値 | false | 冬季料金をかけるか。全員が切り替えられ、全員に反映される |
 | hasStabro | 真偽値 | true | items に「スタブロ」が入っているか（保存時に自動で決まる。「スタブロの記録をつける」ボタンを出すのに使う） |
 | updatedBy | 文字列 | | 最後に編集した人 |
 | updatedAt | 日時 | | 最終更新日時 |
@@ -135,7 +135,7 @@ items の 1 件
 | updatedBy | 文字列 | | 最後に押した人（本人か担当者） |
 | updatedAt | 日時 | | |
 
-> 金額は保存しません。学年・その日の冬季料金・`settings/fees` から、表示するたびに計算します。
+> 金額は保存しません。学年・冬季料金のオン／オフ（`settings/winter`）・`settings/fees` から、表示するたびに計算します。
 
 ### practiceOptions（メニューの選択肢）
 
@@ -155,6 +155,14 @@ items の 1 件
 | juniorHigh | 数値 | 60 |
 | highSchool | 数値 | 120 |
 | winterExtra | 数値 | 50 |
+
+### settings/winter（冬季料金のオン／オフ）
+
+| フィールド | 型 | 例 |
+| --- | --- | --- |
+| isOn | 真偽値 | true（オフにされるまでオンのまま） |
+| updatedBy | 文字列 | taro@gmail.com |
+| updatedAt | 日時 | |
 
 ### settings/sheets（振り返りのスプレッドシート）
 
@@ -281,7 +289,7 @@ items の 1 件
 | members（ゼッケン・専門種目・PB） | 全員 | 本人・顧問・キャプテン・マネージャー | ― |
 | members（削除） | ― | ― | 顧問・キャプテン（関係するデータもまとめて消す） |
 | practiceMenus | 全員 | 顧問・キャプテン・副キャプテン・マネージャー | 同左 |
-| practiceMenus の isWinterRate | 全員 | 全員 | ― |
+| settings/winter | 全員 | 全員 | ― |
 | attendance | 全員 | 本人（自分の分）／顧問・キャプテン・副キャプテン・マネージャー（全員分） | 同左 |
 | practiceOptions | 全員 | 顧問・キャプテン・副キャプテン・マネージャー | ― |
 | settings/fees | 全員 | 顧問 | ― |
@@ -319,3 +327,4 @@ items の 1 件
 | 2026-10-25 | 部員の削除・スプレッドシートの書き込みと共有・通知は、サーバー側で行う | 関係するデータをまとめて消したり、Google のサービスを使ったりするため |
 | 2026-11-01 | records の resultUrl をなくし、meetId を必ず入れる | 記録は登録済みの大会からだけ入力することにしたため |
 | 2026-11-01 | practiceMenus の general・special を items 1 つにまとめ、「専門」は練習の種類の 1 つにする | メニューを全体・専門に分けず、1 つの並びで見せるため |
+| 2026-11-01 | 冬季料金を practiceMenus の isWinterRate（日ごと）から settings/winter（1 つだけ）に移す | 一度オンにしたらオフにされるまでオンのままにするため |
