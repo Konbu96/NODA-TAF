@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { badges } from "@/lib/derived";
-import { canApprove, canEditFees, canEditMenu, hasAdminMenu, isAthlete } from "@/lib/permissions";
+import { canEditFees, canEditMenu, hasAdminMenu, isAthlete } from "@/lib/permissions";
 import type { DbState, Member } from "@/lib/types";
+import { USE_FIREBASE } from "@/lib/firebase";
 import { useApp } from "@/lib/useApp";
-import { BackIcon, ListIcon, MenuIcon, PeopleIcon, PersonIcon, PlusIcon, TrophyIcon } from "./icons";
+import { BackIcon, CloseIcon, HomeIcon, ListIcon, MenuIcon, PeopleIcon, PersonIcon, TrophyIcon } from "./icons";
 import { Badge } from "./ui";
 
 /** ログインと承認を確かめ、必要なら別の画面へ送る */
@@ -18,7 +19,8 @@ export function useGate(askMood = true) {
   let to: string | null = null;
   if (ready) {
     if (!email) to = "/login";
-    else if (!me) to = "/login?noAccount=1";
+    // 本番：ログインはできたが、まだ入部申請をしていない人
+    else if (!me) to = USE_FIREBASE ? "/apply" : "/login?noAccount=1";
     else if (me.status !== "approved") to = "/pending";
     else if (askMood && needMood) to = "/mood";
   }
@@ -55,7 +57,7 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
 
   const navItems: { tab: Tab; href: string; label: string; icon: ReactNode; badge: number }[] = [
     { tab: "mypage", href: "/mypage", label: "マイページ", icon: <PersonIcon />, badge: b.reflection },
-    { tab: "members", href: "/members", label: "部員", icon: <PeopleIcon />, badge: 0 },
+    { tab: "members", href: "/members", label: "部員", icon: <PeopleIcon />, badge: b.pending },
     { tab: "meets", href: "/meets", label: "大会", icon: <TrophyIcon />, badge: b.meets },
     { tab: "menu", href: "/", label: "メニュー", icon: <ListIcon />, badge: 0 },
   ];
@@ -75,7 +77,6 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
               className="relative flex h-11 w-11 items-center justify-center text-white"
             >
               <MenuIcon />
-              {b.pending > 0 && <span aria-label="承認待ちあり" className="absolute top-2 right-[7px] h-[9px] w-[9px] rounded-full border-[1.5px] border-accent bg-[#EF4444]" />}
             </button>
           )}
         </div>
@@ -84,12 +85,6 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
             <button aria-label="管理用のメニューを閉じる" onClick={() => setAdminOpen(false)} className="anim-fade fixed inset-x-0 top-14 bottom-0 mx-auto max-w-[480px] bg-ink/40" />
             <div className="pointer-events-none absolute inset-x-0 top-14 h-[100dvh] overflow-hidden">
               <nav aria-label="管理用のメニュー" className="anim-drop pointer-events-auto flex flex-col rounded-b-2xl bg-white pb-1.5 text-ink shadow-[0_8px_24px_rgba(15,23,42,0.2)]">
-                {canApprove(me) && (
-                  <Link href="/admin/members" className="flex min-h-[60px] items-center gap-2 px-5 text-[17px]">
-                    <span className="grow">部員名簿</span>
-                    {b.pending > 0 && <span className="rounded-xl bg-[#EF4444] px-2.5 py-[3px] text-[13px] font-bold text-white">承認待ち {b.pending}</span>}
-                  </Link>
-                )}
                 {canEditMenu(me) && (
                   <Link href="/admin/options" className="flex min-h-[60px] items-center border-t border-hair px-5 text-[17px]">
                     メニューの選択肢
@@ -140,9 +135,7 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
           aria-label={navOpen ? "行き先を閉じる" : "行き先を開く"}
           className="pointer-events-auto absolute right-5 bottom-6 flex h-[60px] w-[60px] items-center justify-center rounded-full bg-accent text-white shadow-[0_6px_18px_rgba(30,58,138,0.4)]"
         >
-          <span className={`transition-transform duration-200 ${navOpen ? "rotate-45" : ""}`}>
-            <PlusIcon />
-          </span>
+          {navOpen ? <CloseIcon size={26} /> : <HomeIcon />}
           {!navOpen && anyBadge && <span className="absolute top-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-warn" />}
         </button>
       </div>

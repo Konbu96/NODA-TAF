@@ -7,7 +7,7 @@ import { SubShell } from "@/components/Shell";
 import { Card, Chip, Label, PrimaryButton, Sheet, Toast } from "@/components/ui";
 import { gradeOf } from "@/lib/grade";
 import { EVENT_GROUPS, liveMark, markToDigits, onlyDigits, parseMark } from "@/lib/marks";
-import { canEditProfileOf } from "@/lib/permissions";
+import { canEditProfileOf, hasEvents, isAthlete } from "@/lib/permissions";
 import { saveProfile } from "@/lib/store";
 import type { DbState, Member } from "@/lib/types";
 
@@ -34,8 +34,13 @@ function Inner() {
   );
 }
 
+const GENDERS = ["男", "女"];
+const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
+
 function Form({ target, me, today }: { db: DbState; target: Member; me: Member; today: string }) {
   const [bib, setBib] = useState(target.bibNumber);
+  const [gender, setGender] = useState(target.gender ?? "");
+  const [restDay, setRestDay] = useState(target.restDay ?? "");
   const [events, setEvents] = useState<string[]>(target.events);
   const [raw, setRaw] = useState<Record<string, string>>(() =>
     Object.fromEntries(target.personalBests.filter((p) => p.manualMark).map((p) => [p.event, markToDigits(p.manualMark)])),
@@ -43,6 +48,8 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
   const [sheet, setSheet] = useState(false);
   const [saved, setSaved] = useState(false);
   const self = me.email === target.email;
+  // マネージャー・顧問には、ゼッケン・専門種目・PB の欄を出さない
+  const athlete = hasEvents(target);
 
   return (
     <>
@@ -51,54 +58,84 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
         <p className="mt-0.5 mb-0 text-[13px] text-muted">{gradeOf(target.graduationYear, today)}</p>
       </section>
 
-      <Card className="flex flex-col gap-2">
-        <label className="flex flex-col gap-1.5">
-          <Label>ゼッケン</Label>
-          <input
-            inputMode="numeric"
-            value={bib}
-            onChange={(e) => setBib(onlyDigits(e.target.value, 5))}
-            className="h-11 w-[120px] rounded-[10px] border border-line px-3 text-base"
-          />
-        </label>
-      </Card>
+      {athlete && (
+        <Card className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1.5">
+            <Label>ゼッケン</Label>
+            <input
+              inputMode="numeric"
+              value={bib}
+              onChange={(e) => setBib(onlyDigits(e.target.value, 5))}
+              className="h-11 w-[120px] rounded-[10px] border border-line px-3 text-base"
+            />
+          </label>
+        </Card>
+      )}
 
-      <Card className="flex flex-col gap-1">
-        <Label className="mb-1">専門種目と PB</Label>
-        <p className="mt-0 mb-1 text-[11px] text-muted">PB はアプリを使い始める前のベストを入れてください。大会の記録を入れると自動で更新されます。</p>
-        {events.map((ev) => {
-          const d = raw[ev] ?? "";
-          const parsed = parseMark(ev, d);
-          const recordPb = target.personalBests.find((p) => p.event === ev && p.recordId);
-          return (
-            <div key={ev} className="flex min-h-14 items-center gap-2.5 border-t border-hair py-1.5">
-              <b className="w-16 shrink-0 text-[15px]">{ev}</b>
-              <div className="flex grow flex-col gap-0.5">
-                <input
-                  inputMode="numeric"
-                  placeholder="数字のみ入力"
-                  value={liveMark(ev, d)}
-                  onChange={(e) => setRaw({ ...raw, [ev]: onlyDigits(e.target.value) })}
-                  aria-label={`${ev} の PB`}
-                  className="h-11 w-full rounded-[10px] border border-line px-3 text-base"
-                />
-                {parsed && <span className="text-xs text-muted">{parsed.mark} として保存します</span>}
-                {recordPb && <span className="text-xs text-accent">大会の PB：{recordPb.mark}</span>}
-              </div>
-              <button onClick={() => setEvents(events.filter((x) => x !== ev))} aria-label={`${ev} を外す`} className="flex h-9 w-9 items-center justify-center text-[#94A3B8]">
-                <CloseIcon />
-              </button>
+      {/* 顧問は性別・休みの曜日を持たない */}
+      {isAthlete(target) && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label>性別</Label>
+            <div className="flex gap-1.5">
+              {GENDERS.map((g) => (
+                <Chip key={g} on={gender === g} onClick={() => setGender(gender === g ? "" : g)} className="w-14 justify-center">
+                  {g}
+                </Chip>
+              ))}
             </div>
-          );
-        })}
-        <button onClick={() => setSheet(true)} className="mt-1.5 h-11 rounded-[10px] border border-dashed border-[#93C5FD] bg-[#F8FAFC] text-sm font-bold text-accent">
-          ＋ 種目を選ぶ
-        </button>
-      </Card>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>休みの曜日</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((d) => (
+                <Chip key={d} on={restDay === `${d}曜日`} onClick={() => setRestDay(restDay === `${d}曜日` ? "" : `${d}曜日`)} className="w-11 justify-center">
+                  {d}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {athlete && (
+        <Card className="flex flex-col gap-1">
+          <Label className="mb-1">専門種目と PB</Label>
+          <p className="mt-0 mb-1 text-[11px] text-muted">PB はアプリを使い始める前のベストを入れてください。大会の記録を入れると自動で更新されます。</p>
+          {events.map((ev) => {
+            const d = raw[ev] ?? "";
+            const parsed = parseMark(ev, d);
+            const recordPb = target.personalBests.find((p) => p.event === ev && p.recordId);
+            return (
+              <div key={ev} className="flex min-h-14 items-center gap-2.5 border-t border-hair py-1.5">
+                <b className="w-16 shrink-0 text-[15px]">{ev}</b>
+                <div className="flex grow flex-col gap-0.5">
+                  <input
+                    inputMode="numeric"
+                    placeholder="数字のみ入力"
+                    value={liveMark(ev, d)}
+                    onChange={(e) => setRaw({ ...raw, [ev]: onlyDigits(e.target.value) })}
+                    aria-label={`${ev} の PB`}
+                    className="h-11 w-full rounded-[10px] border border-line px-3 text-base"
+                  />
+                  {parsed && <span className="text-xs text-muted">{parsed.mark} として保存します</span>}
+                  {recordPb && <span className="text-xs text-accent">大会の PB：{recordPb.mark}</span>}
+                </div>
+                <button onClick={() => setEvents(events.filter((x) => x !== ev))} aria-label={`${ev} を外す`} className="flex h-9 w-9 items-center justify-center text-[#94A3B8]">
+                  <CloseIcon />
+                </button>
+              </div>
+            );
+          })}
+          <button onClick={() => setSheet(true)} className="mt-1.5 h-11 rounded-[10px] border border-dashed border-[#93C5FD] bg-[#F8FAFC] text-sm font-bold text-accent">
+            ＋ 種目を選ぶ
+          </button>
+        </Card>
+      )}
 
       <PrimaryButton
         onClick={async () => {
-          await saveProfile(target.email, bib, events, raw);
+          await saveProfile(target.email, { bibNumber: bib, gender, restDay }, events, raw);
           setSaved(true);
         }}
       >
@@ -124,7 +161,14 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
       {saved && (
         <Toast
           text="保存しました"
-          link={self ? { href: "/mypage", label: "マイページへ" } : { href: `/members/detail?id=${encodeURIComponent(target.email)}`, label: "部員のページへ" }}
+          link={
+            self
+              ? { href: "/mypage", label: "マイページへ" }
+              : {
+                  href: `/members/detail?id=${encodeURIComponent(target.email)}`,
+                  label: "部員のページへ",
+                }
+          }
           onDone={() => setSaved(false)}
         />
       )}

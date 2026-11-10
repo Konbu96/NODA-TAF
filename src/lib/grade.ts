@@ -1,5 +1,5 @@
 import { fiscalYear } from "./dates";
-import type { Fees, Member } from "./types";
+import type { Fees, Member, Role } from "./types";
 
 // 学年は保存せず、高校を卒業する年度から計算する。
 export const GRADES = ["中1", "中2", "中3", "高1", "高2", "高3"] as const;
@@ -39,11 +39,21 @@ export const ROLE_LABEL: Record<Member["role"], string> = {
   member: "部員",
 };
 
-/** 学年が上の順（高3 → 中1）、同じ学年は名前順 */
+// 同じ学年の中で並べる役職の順
+const ROLE_ORDER: Role[] = ["adviser", "captain", "viceCaptain", "manager", "member"];
+
+// 女子を先に、性別が未入力の人は最後
+const GENDER_ORDER = ["女", "男", ""];
+
+/** 学年が上の順（高3 → 中1）→ 役職順（キャプテン → 副キャプテン → マネージャー → 部員）→ 女子・男子 → 名前順 */
 export function sortMembers(list: Member[], today: string): Member[] {
   const rank = (m: Member) => {
     const g = gradeOf(m.graduationYear, today);
     return g ? GRADES.indexOf(g) : -1;
   };
-  return [...list].sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, "ja"));
+  const roleRank = (m: Member) => ROLE_ORDER.indexOf(m.role);
+  const genderRank = (m: Member) => GENDER_ORDER.indexOf(m.gender ?? "");
+  return [...list].sort(
+    (a, b) => rank(b) - rank(a) || roleRank(a) - roleRank(b) || genderRank(a) - genderRank(b) || a.name.localeCompare(b.name, "ja"),
+  );
 }

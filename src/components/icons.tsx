@@ -29,7 +29,10 @@ export const PencilIcon = ({ size = 18, className }: P) => (
 export const MenuIcon = ({ size = 22, className }: P) => (
   <svg {...base(size)} className={className}><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></svg>
 );
-export const PlusIcon = ({ size = 26, className }: P) => (
+export const HomeIcon = ({ size = 26, className }: P) => (
+  <svg {...base(size)} strokeWidth={2.2} className={className}><path d="M3 11 12 3.5 21 11" /><path d="M5.5 9v11h13V9" /><path d="M10 20v-6h4v6" /></svg>
+);
+export const PlusIcon = ({ size = 18, className }: P) => (
   <svg {...base(size)} strokeWidth={2.2} className={className}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
 );
 export const CloseIcon = ({ size = 18, className }: P) => (
@@ -58,4 +61,10 @@ export const BigTrophyIcon = ({ size = 64, className }: P) => (
 );
 export const HourglassIcon = ({ size = 64, className }: P) => (
   <svg {...base(size)} strokeWidth={1.4} className={className}><path d="M6 3h12M6 21h12" /><path d="M7 3v3a5 5 0 0 0 10 0V3" /><path d="M7 21v-3a5 5 0 0 1 10 0v3" /></svg>
+);
+export const EyeIcon = ({ size = 20, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+export const EyeOffIcon = ({ size = 20, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1" /><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
 );

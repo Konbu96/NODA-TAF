@@ -5,8 +5,10 @@ import { useState } from "react";
 import { MoodFace } from "@/components/MoodFace";
 import { MainShell } from "@/components/Shell";
 import { monthLabel } from "@/lib/dates";
-import { athletes, reflectionStatus } from "@/lib/derived";
+import { athletes, pendingMembers, reflectionStatus } from "@/lib/derived";
 import { gradeOf, GRADES, ROLE_LABEL, sortMembers } from "@/lib/grade";
+import { canApprove, writesReflection } from "@/lib/permissions";
+import { DownIcon, NextIcon } from "@/components/icons";
 import type { DbState, Member } from "@/lib/types";
 
 export default function MembersPage() {
@@ -17,11 +19,15 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
   const myGrade = gradeOf(me.graduationYear, today);
   const [open, setOpen] = useState<string>(myGrade ?? "高2");
   const [q, setQ] = useState("");
+  const [showMissing, setShowMissing] = useState(false);
   const list = sortMembers(athletes(db), today);
   const month = reflectionStatus(db, me, today).month;
-  const submitted = list.filter((m) => db.goals[`${month}_${m.email}`]);
-  const missing = list.filter((m) => !db.goals[`${month}_${m.email}`]);
-  const ratio = list.length ? Math.round((submitted.length / list.length) * 100) : 0;
+  const writers = list.filter(writesReflection);
+  const submitted = writers.filter((m) => db.goals[`${month}_${m.email}`]);
+  const missing = writers.filter((m) => !db.goals[`${month}_${m.email}`]);
+  const ratio = writers.length ? Math.round((submitted.length / writers.length) * 100) : 0;
+  const approver = canApprove(me);
+  const pending = approver ? pendingMembers(db).length : 0;
   const query = q.trim();
   const groups = [...GRADES].reverse().map((g) => ({ g, people: list.filter((m) => gradeOf(m.graduationYear, today) === g) })).filter((x) => x.people.length);
 
@@ -39,7 +45,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
             {m.role === "manager" ? ROLE_LABEL.manager : [m.bibNumber, m.events.join(" / ")].filter(Boolean).join("・")}
           </span>
         </span>
-        {goal ? (
+        {!writesReflection(m) ? null : goal ? (
           <span className="mt-[3px] block text-[13px] text-[#334155]">目標：{goal}</span>
         ) : (
           <span className="mt-[3px] block text-[13px] text-warn-dark">未提出</span>
@@ -50,27 +56,47 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
 
   return (
     <>
-      <section className="flex flex-col gap-2 rounded-xl bg-white px-4 py-3">
-        <div className="flex items-baseline justify-between">
-          <p className="m-0 text-[13px] font-bold text-sub">{monthLabel(month)}の振り返り</p>
-          <p className="m-0 text-[13px]">
-            <span className="text-lg font-bold text-accent">{submitted.length}</span> / {list.length}人 提出済み
-          </p>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
+      {approver && (
+        <Link href="/admin/members" className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-4 text-[15px]">
+          <span className="grow">部員名簿</span>
+          {pending > 0 && <span className="rounded-xl bg-[#EF4444] px-2.5 py-[3px] text-xs font-bold text-white">承認待ち {pending}</span>}
+          <NextIcon className="text-line" />
+        </Link>
+      )}
+
+      <section className="rounded-xl bg-white px-4 py-2.5">
+        <button
+          onClick={() => setShowMissing(!showMissing)}
+          disabled={missing.length === 0 && !db.sheetsUrl}
+          aria-expanded={showMissing}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          <span className="text-[13px] font-bold text-sub">{monthLabel(month)}の振り返り</span>
+          <span className="grow text-[13px]">
+            <b className="text-accent">{submitted.length}</b> / {writers.length}人
+          </span>
+          {missing.length > 0 && <span className="text-xs font-bold text-warn-dark">未提出 {missing.length}人</span>}
+          {(missing.length > 0 || db.sheetsUrl) && (
+            <DownIcon className={`shrink-0 text-[#94A3B8] transition-transform ${showMissing ? "rotate-180" : ""}`} />
+          )}
+        </button>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#E2E8F0]">
           <div className="h-full bg-accent" style={{ width: `${ratio}%` }} />
         </div>
-        {missing.length > 0 && (
-          <p className="m-0 text-[13px] leading-[1.6] text-warn-dark">
-            <span className="font-bold">未提出：</span>
-            {missing.slice(0, 3).map((m) => m.name).join("、")}
-            {missing.length > 3 && ` ほか ${missing.length - 3}人`}
-          </p>
-        )}
-        {db.sheetsUrl && (
-          <a href={db.sheetsUrl} target="_blank" rel="noreferrer" className="text-[13px] text-accent underline">
-            振り返りのスプレッドシートを開く ↗
-          </a>
+        {showMissing && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {missing.length > 0 && (
+              <p className="m-0 text-[13px] leading-[1.6] text-warn-dark">
+                <span className="font-bold">未提出：</span>
+                {missing.map((m) => m.name).join("、")}
+              </p>
+            )}
+            {db.sheetsUrl && (
+              <a href={db.sheetsUrl} target="_blank" rel="noreferrer" className="text-[13px] text-accent underline">
+                振り返りのスプレッドシートを開く ↗
+              </a>
+            )}
+          </div>
         )}
       </section>
 

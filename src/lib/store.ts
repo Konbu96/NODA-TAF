@@ -4,16 +4,18 @@ import { useSyncExternalStore } from "react";
 import { nowIso, todayStr } from "./dates";
 import { graduationYearFor, type Grade } from "./grade";
 import { isBetter, parseMark, WIND_EVENTS, windValue } from "./marks";
+import { authSignOut, emailSignIn, emailSignUp, emptyDb, startSync, USE_FIREBASE, writeDiff } from "./firebase";
 import { bestFor, recomputeAllPBs } from "./pb";
 import { createSeed } from "./seed";
+import { WARM_UP_DETAILS } from "./warmUpSeed";
 import type {
   DbState, Fees, Meet, Member, MoodKind, PracticeMenu, PracticeOptions, RecordDoc, Role, StabroDistance,
 } from "./types";
 
 /*
- * お試し版のデータ置き場。データはこのブラウザの中（localStorage）にだけ保存する。
- * Firebase に移すときは、この中の読み書きを Firestore に置き換える。
- * 画面からは useDb() で全体を読み、下の actions で書き込む（どれも Promise を返す）。
+ * データ置き場。画面からは useStore() で全体を読み、下の actions で書き込む（どれも Promise を返す）。
+ * - 本番：Firestore に保存する（読み書きの中身は firebase.ts）
+ * - お試し版（.env.local に Firebase の設定がないとき）：このブラウザの中（localStorage）にだけ保存する
  */
 
 const DB_KEY = "noda-taf-demo-db-v1";
@@ -23,8 +25,33 @@ let state: DbState | null = null;
 let session: string | null = null;
 const listeners = new Set<() => void>();
 
+let fbReady = false;
+let readyWaiters: (() => void)[] = [];
+
 function load() {
   if (state) return;
+  if (USE_FIREBASE) {
+    state = emptyDb();
+    startSync({
+      onUser: (email) => {
+        session = email;
+        fbReady = false;
+        emit();
+      },
+      onData: (patch) => {
+        state = { ...(state as DbState), ...patch };
+        emit();
+      },
+      onReady: () => {
+        fbReady = true;
+        emit();
+        const w = readyWaiters;
+        readyWaiters = [];
+        w.forEach((f) => f());
+      },
+    });
+    return;
+  }
   try {
     const raw = localStorage.getItem(DB_KEY);
     state = raw ? (JSON.parse(raw) as DbState) : null;
@@ -37,9 +64,48 @@ function load() {
   } catch {
     session = null;
   }
+  addWarmUpDetailsOnce();
+  fillMemberDefaults();
+}
+
+/** 前に保存されたお試しデータの部員に、あとから足した項目（性別・休みの曜日）を空で入れる */
+function fillMemberDefaults() {
+  const s = state as DbState;
+  const members = Object.fromEntries(
+    Object.entries(s.members).map(([k, m]) => [k, { ...m, gender: m.gender ?? "", restDay: m.restDay ?? "" }]),
+  );
+  state = { ...s, members };
+}
+
+const WARMUP_FLAG = "noda-taf-demo-warmup-v1";
+
+/** 前に保存されたお試しデータに、アップの中身（アクティベーション・動き作り）を一度だけ足す */
+function addWarmUpDetailsOnce() {
+  try {
+    if (localStorage.getItem(WARMUP_FLAG)) return;
+  } catch {
+    return;
+  }
+  const s = state as DbState;
+  const rename = (w: string) => (w === "アクティベーションドリル" ? "アクティベーション" : w);
+  const details = { ...(s.warmUpDetails ?? {}) };
+  const warmUps = s.options.warmUps.map(rename);
+  for (const [name, text] of Object.entries(WARM_UP_DETAILS)) {
+    if (!details[name]) details[name] = text;
+    if (!warmUps.includes(name)) warmUps.push(name);
+  }
+  const menus = Object.fromEntries(Object.entries(s.menus).map(([k, m]) => [k, { ...m, warmUp: m.warmUp.map(rename) }]));
+  state = { ...s, menus, options: { ...s.options, warmUps }, warmUpDetails: details };
+  persist();
+  try {
+    localStorage.setItem(WARMUP_FLAG, "1");
+  } catch {
+    // 保存できなくても動く
+  }
 }
 
 function persist() {
+  if (USE_FIREBASE) return;
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(state));
     if (session) localStorage.setItem(SESSION_KEY, session);
@@ -64,14 +130,23 @@ function subscribe(l: () => void) {
 
 function getSnapshot() {
   load();
+  if (USE_FIREBASE && !fbReady) return null;
   if (!snapshot) snapshot = { db: state as DbState, email: session };
   return snapshot;
 }
 
+let lastWrite: Promise<void> = Promise.resolve();
+
 function update(fn: (draft: DbState) => DbState) {
   load();
-  state = fn(state as DbState);
+  const prev = state as DbState;
+  state = fn(prev);
   emit();
+  if (USE_FIREBASE) {
+    lastWrite = writeDiff(prev, state).then((ok) => {
+      if (!ok) alert("保存できませんでした。通信の状態を確かめて、もう一度試してください。");
+    });
+  }
 }
 
 /** 今のデータ（画面の外から読むとき用） */
@@ -84,10 +159,25 @@ export function useStore() {
   return useSyncExternalStore(subscribe, getSnapshot, () => null);
 }
 
-const done = () => Promise.resolve();
+/** 直前の書き込みが終わるまで待つ */
+const done = () => lastWrite;
 
 // ---------- ログイン ----------
 
+/**
+ * 本番：メールアドレスとパスワードでログイン（create のときはアカウントを作る）し、読み込みが終わるまで待つ。
+ * ログインした人のメールアドレスを返す。うまくいかないときは Firebase のエラーを投げる
+ */
+export async function signInWithEmail(mode: "login" | "create", email: string, password: string): Promise<string> {
+  load();
+  const me = mode === "create" ? await emailSignUp(email, password) : await emailSignIn(email, password);
+  if (!(fbReady && session === me)) {
+    await new Promise<void>((resolve) => readyWaiters.push(resolve));
+  }
+  return me;
+}
+
+/** お試し版：選んだアカウントでログインする */
 export function login(email: string) {
   load();
   session = email.toLowerCase();
@@ -97,6 +187,7 @@ export function login(email: string) {
 
 export function logout() {
   load();
+  if (USE_FIREBASE) return authSignOut();
   session = null;
   emit();
   return done();
@@ -104,6 +195,7 @@ export function logout() {
 
 /** お試しデータを最初の状態に戻す */
 export function resetDemo() {
+  if (USE_FIREBASE) return;
   state = createSeed(todayStr());
   session = null;
   emit();
@@ -119,7 +211,27 @@ export function apply(email: string, name: string, grade: Grade) {
       ...s.members,
       [email]: {
         email, name, status: "pending", role: "member", isAdmin: false,
-        graduationYear: graduationYearFor(grade, todayStr()), bibNumber: "", events: [],
+        graduationYear: graduationYearFor(grade, todayStr()), bibNumber: "", gender: "", restDay: "", events: [],
+        personalBests: [], stabroBests: {}, createdAt: now, updatedAt: now,
+      },
+    },
+  }));
+  return done();
+}
+
+export type NewMember = Pick<Member, "name" | "role" | "bibNumber" | "gender" | "restDay" | "events"> & { grade: Grade | null };
+
+/** 顧問・開発者が部員を名簿に直接登録する（承認済みになる）。本人はあとで同じメールアドレスでアカウントを作れば入れる */
+export function addMember(email: string, m: NewMember) {
+  const now = nowIso();
+  update((s) => ({
+    ...s,
+    members: {
+      ...s.members,
+      [email]: {
+        email, name: m.name, status: "approved", role: m.role, isAdmin: false,
+        graduationYear: m.role === "adviser" || !m.grade ? null : graduationYearFor(m.grade, todayStr()),
+        bibNumber: m.bibNumber, gender: m.gender, restDay: m.restDay, events: m.events,
         personalBests: [], stabroBests: {}, createdAt: now, updatedAt: now,
       },
     },
@@ -165,7 +277,12 @@ export function removeMember(email: string) {
   return done();
 }
 
-export function saveProfile(email: string, bibNumber: string, events: string[], manualDigits: Record<string, string>) {
+export function saveProfile(
+  email: string,
+  { bibNumber, gender, restDay }: Pick<Member, "bibNumber" | "gender" | "restDay">,
+  events: string[],
+  manualDigits: Record<string, string>,
+) {
   update((s) => {
     const m = s.members[email];
     const pbs = events.map((ev) => {
@@ -179,7 +296,7 @@ export function saveProfile(email: string, bibNumber: string, events: string[], 
     });
     // 専門から外した種目でも、大会記録の PB は残す
     const kept = m.personalBests.filter((p) => !events.includes(p.event)).map((p) => ({ ...p, manualMark: "" }));
-    const next: Member = { ...m, bibNumber, events, personalBests: [...pbs, ...kept], updatedAt: nowIso() };
+    const next: Member = { ...m, bibNumber, gender, restDay, events, personalBests: [...pbs, ...kept], updatedAt: nowIso() };
     next.personalBests = recomputeAllPBs(s, next);
     return { ...s, members: { ...s.members, [email]: next } };
   });
@@ -234,6 +351,27 @@ export function saveOptions(options: PracticeOptions) {
   return done();
 }
 
+/** アップを新しく足す（選択肢にも入る） */
+export function addWarmUp(name: string, text: string) {
+  update((s) => ({
+    ...s,
+    options: s.options.warmUps.includes(name) ? s.options : { ...s.options, warmUps: [...s.options.warmUps, name] },
+    warmUpDetails: text.trim() ? { ...s.warmUpDetails, [name]: text.trim() } : s.warmUpDetails,
+  }));
+  return done();
+}
+
+/** アップの中身を保存する。空にすると消す */
+export function saveWarmUpDetail(name: string, text: string) {
+  update((s) => {
+    const warmUpDetails = { ...s.warmUpDetails };
+    if (text.trim()) warmUpDetails[name] = text.trim();
+    else delete warmUpDetails[name];
+    return { ...s, warmUpDetails };
+  });
+  return done();
+}
+
 export function saveFees(fees: Fees) {
   update((s) => ({ ...s, fees }));
   return done();
@@ -281,7 +419,7 @@ export function saveRecords(meet: Meet, email: string, inputs: RecordInput[], by
     member = { ...member, personalBests: recomputeAllPBs(next, member) };
     return { ...next, members: { ...s.members, [email]: member } };
   });
-  return Promise.resolve(updates);
+  return lastWrite.then(() => updates);
 }
 
 export function deleteRecord(id: string) {
@@ -305,7 +443,7 @@ export function saveMeet(meet: Omit<Meet, "updatedAt" | "updatedBy">, by: string
     records: Object.fromEntries(Object.entries(s.records).map(([k, r]) =>
       [k, r.meetId === id ? { ...r, meetName: meet.name, date: meet.startDate } : r])),
   }));
-  return Promise.resolve(id);
+  return lastWrite.then(() => id);
 }
 
 export function deleteMeet(id: string) {

@@ -2,10 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { AlertIcon } from "@/components/icons";
+import { AlertIcon, EyeIcon, EyeOffIcon } from "@/components/icons";
 import { Sheet } from "@/components/ui";
 import { ROLE_LABEL } from "@/lib/grade";
-import { login, resetDemo } from "@/lib/store";
+import { authErrorText, sendReset, USE_FIREBASE } from "@/lib/firebase";
+import { getDb, login, resetDemo, signInWithEmail } from "@/lib/store";
 import { useApp } from "@/lib/useApp";
 
 export default function Page() {
@@ -24,7 +25,11 @@ function Login() {
   const [picker, setPicker] = useState<null | "login" | "create">(null);
   const [typed, setTyped] = useState("");
 
-  // お試し版では Google の代わりに、アカウントを選ぶ画面を出す
+  // 本番はメールアドレスとパスワードの画面、お試し版はアカウントを選ぶ画面を出す
+  const [authMode, setAuthMode] = useState<null | "login" | "create">(null);
+  const open = (mode: "login" | "create") => (USE_FIREBASE ? setAuthMode(mode) : setPicker(mode));
+
+  // お試し版：選んだアカウントで入る
   const choose = async (raw: string) => {
     const email = raw.trim().toLowerCase();
     if (!email || !db) return;
@@ -98,13 +103,13 @@ function Login() {
           </div>
         )}
         <button
-          onClick={() => setPicker("login")}
+          onClick={() => open("login")}
           className={`h-14 rounded-[28px] text-[17px] font-bold ${noAccount ? "bg-white/20 text-accent-soft" : "bg-white text-accent"}`}
         >
           ログイン
         </button>
         <button
-          onClick={() => setPicker("create")}
+          onClick={() => open("create")}
           className={`flex h-14 flex-col items-center justify-center rounded-[28px] border-2 border-white leading-[1.3] ${
             noAccount ? "bg-white text-accent shadow-[0_0_0_4px_rgba(253,186,116,0.9)]" : "bg-transparent text-white"
           }`}
@@ -112,7 +117,7 @@ function Login() {
           <span className="text-base font-bold">アカウント作成</span>
           <span className="text-[11px] opacity-85">初めての人</span>
         </button>
-        <button
+        {!USE_FIREBASE && <button
           onClick={() => {
             if (confirm("お試しデータを最初の状態に戻しますか？")) {
               resetDemo();
@@ -122,8 +127,16 @@ function Login() {
           className="mt-1.5 text-[11px] text-[#BFDBFE] underline"
         >
           （お試し版）データを最初の状態に戻す
-        </button>
+        </button>}
       </div>
+
+      {USE_FIREBASE && (
+        <EmailAuthSheet
+          mode={authMode}
+          onMode={setAuthMode}
+          onDone={(hasMember) => router.replace(hasMember ? "/" : "/apply")}
+        />
+      )}
 
       <Sheet open={picker === "login"} onClose={() => setPicker(null)} title="Google アカウントを選ぶ（お試し版）">
         <p className="m-0 text-xs leading-relaxed text-muted">
@@ -159,5 +172,121 @@ function Login() {
         {emailForm("自分で決める（メールアドレス）", "作成")}
       </Sheet>
     </div>
+  );
+}
+
+/** 本番のログイン・アカウント作成（メールアドレスとパスワード） */
+function EmailAuthSheet({
+  mode, onMode, onDone,
+}: {
+  mode: null | "login" | "create";
+  onMode: (m: null | "login" | "create") => void;
+  onDone: (hasMember: boolean) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const create = mode === "create";
+
+  const switchTo = (m: "login" | "create") => {
+    setError("");
+    setInfo("");
+    onMode(m);
+  };
+
+  const submit = async () => {
+    if (!mode) return;
+    setBusy(true);
+    setError("");
+    setInfo("");
+    try {
+      const me = await signInWithEmail(mode, email, password);
+      onDone(!!getDb().members[me]);
+    } catch (e) {
+      setError(authErrorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    setError("");
+    setInfo("");
+    if (!email.trim()) {
+      setError("先にメールアドレスを入れてください。");
+      return;
+    }
+    try {
+      await sendReset(email);
+      setInfo("パスワードを決め直すメールを送りました。メールのリンクから新しいパスワードを決めてください。");
+    } catch (e) {
+      setError(authErrorText(e));
+    }
+  };
+
+  return (
+    <Sheet open={!!mode} onClose={() => onMode(null)} title={create ? "アカウント作成" : "ログイン"}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        className="flex flex-col gap-3"
+      >
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-bold text-sub">メールアドレス</span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-12 rounded-[10px] border border-line px-3.5 text-base"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-bold text-sub">パスワード{create && "（6 文字以上）"}</span>
+          <div className="relative">
+            <input
+              type={showPw ? "text" : "password"}
+              autoComplete={create ? "new-password" : "current-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-12 w-full rounded-[10px] border border-line pr-12 pl-3.5 text-base"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(!showPw)}
+              aria-label={showPw ? "パスワードを隠す" : "パスワードを見る"}
+              aria-pressed={showPw}
+              className="absolute top-0 right-0 flex h-12 w-12 items-center justify-center text-muted"
+            >
+              {showPw ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
+        </label>
+        {error && <p role="alert" className="m-0 text-[13px] font-bold text-danger">{error}</p>}
+        {info && <p className="m-0 text-[13px] text-accent">{info}</p>}
+        <button
+          type="submit"
+          disabled={busy || !email.trim() || !password}
+          className="h-12 rounded-[24px] bg-accent text-base font-bold text-white disabled:opacity-40"
+        >
+          {busy ? "少し待ってください…" : create ? "アカウントを作る" : "ログイン"}
+        </button>
+      </form>
+      <div className="flex flex-col items-center gap-1">
+        {!create && (
+          <button onClick={reset} className="h-10 text-[13px] text-sub underline">
+            パスワードを忘れたとき
+          </button>
+        )}
+        <button onClick={() => switchTo(create ? "login" : "create")} className="h-10 text-[13px] text-accent underline">
+          {create ? "アカウントがある人はこちら（ログイン）" : "初めての人はこちら（アカウント作成）"}
+        </button>
+      </div>
+    </Sheet>
   );
 }

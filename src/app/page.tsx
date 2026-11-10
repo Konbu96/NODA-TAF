@@ -2,31 +2,33 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { BackIcon, DownIcon, NextIcon, PencilIcon } from "@/components/icons";
+import { BackIcon, DownIcon, NextIcon, PencilIcon, PlusIcon } from "@/components/icons";
+import { WarmUpText } from "@/components/WarmUpText";
 import { MainShell } from "@/components/Shell";
 import { chipOff, chipOn, Sheet } from "@/components/ui";
 import { addDays, dayLabel, diffDays } from "@/lib/dates";
 import { approvedMembers, latestGoal } from "@/lib/derived";
 import { feeFor, isPayer, sortMembers } from "@/lib/grade";
 import { itemLine } from "@/lib/menuText";
-import { canEditMenu, isAthlete } from "@/lib/permissions";
+import { canEditMenu, writesReflection } from "@/lib/permissions";
 import { setAttendance, setWinter } from "@/lib/store";
 import type { DbState, Member } from "@/lib/types";
+import { familyName } from "@/lib/names";
 
 export default function MenuPage() {
   return <MainShell title="メニュー" tab="menu">{(ctx) => <MenuBody {...ctx} />}</MainShell>;
 }
 
-const familyName = (name: string) => name.split(/[\s　]/)[0];
 
 function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string }) {
   const [offset, setOffset] = useState(0);
+  const [openWarm, setOpenWarm] = useState<string | null>(null);
   const [pbOpen, setPbOpen] = useState(false);
   const swipeX = useRef<number | null>(null);
   const date = addDays(today, offset);
   const menu = db.menus[date];
   const editor = canEditMenu(me);
-  const goal = isAthlete(me) ? latestGoal(db, me.email) : "";
+  const goal = writesReflection(me) ? latestGoal(db, me.email) : "";
 
   const recentPbs = Object.values(db.records)
     .filter((r) => r.isPB && diffDays(today, r.date) >= 0 && diffDays(today, r.date) < 3 && db.members[r.memberId])
@@ -49,7 +51,7 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
           <button onClick={() => setPbOpen(!pbOpen)} aria-expanded={pbOpen} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-warn-dark">
             <span className="text-[13px] font-bold">最近の PB</span>
             <span className="grow text-[13px] text-[#7C2D12]">
-              {familyName(db.members[recentPbs[0].memberId].name)}さん{recentPbs.length > 1 ? ` ほか ${recentPbs.length - 1}人` : ""}
+              {familyName(db.members[recentPbs[0].memberId].name)}{recentPbs.length > 1 ? ` ほか ${recentPbs.length - 1}人` : ""}
             </span>
             <DownIcon className={`transition-transform ${pbOpen ? "rotate-180" : ""}`} />
           </button>
@@ -57,7 +59,7 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
             <div className="flex flex-col gap-1 px-4 pb-3">
               {recentPbs.map((r) => (
                 <p key={r.id} className="m-0 text-sm">
-                  {familyName(db.members[r.memberId].name)}さん　{r.event}　{r.mark}
+                  {familyName(db.members[r.memberId].name)}　{r.event}　{r.mark}
                 </p>
               ))}
             </div>
@@ -105,7 +107,31 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
               {menu.warmUp.length > 0 && (
                 <div>
                   <p className="mb-1 mt-0 text-xs font-bold text-sub">アップ</p>
-                  <p className="m-0 text-[15px] leading-[1.6]">{menu.warmUp.join("、")}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {menu.warmUp.map((w) =>
+                      db.warmUpDetails[w] ? (
+                        <button
+                          key={w}
+                          onClick={() => setOpenWarm(openWarm === w ? null : w)}
+                          aria-expanded={openWarm === w}
+                          className={`flex h-8 items-center gap-1 rounded-full pr-2 pl-3 text-[14px] ${openWarm === w ? "bg-accent text-white" : "bg-accent-soft text-accent"}`}
+                        >
+                          {w}
+                          <DownIcon size={16} className={`transition-transform ${openWarm === w ? "rotate-180" : ""}`} />
+                        </button>
+                      ) : (
+                        <span key={w} className="flex h-8 items-center rounded-full bg-hair px-3 text-[14px]">
+                          {w}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                  {openWarm && menu.warmUp.includes(openWarm) && db.warmUpDetails[openWarm] && (
+                    <div className="mt-2 rounded-[10px] bg-[#F8FAFC] px-3.5 py-3">
+                      <p className="mt-0 mb-1.5 text-[13px] font-bold text-accent">{openWarm}</p>
+                      <WarmUpText text={db.warmUpDetails[openWarm]} />
+                    </div>
+                  )}
                 </div>
               )}
               {menu.items.length > 0 && (
@@ -135,7 +161,8 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
           <div className="flex flex-col items-center gap-3 border-t border-[#E2E8F0] px-4 py-7 text-center">
             <p className="m-0 text-sm text-sub">まだ登録されていません</p>
             {editor && (
-              <Link href={`/menu/edit?date=${date}`} className="rounded-[10px] border-2 border-accent px-5 py-2.5 text-sm font-bold text-accent">
+              <Link href={`/menu/edit?date=${date}`} className="flex items-center gap-1.5 rounded-full bg-accent-soft px-5 py-2.5 text-sm font-bold text-accent">
+                <PlusIcon />
                 メニューを登録する
               </Link>
             )}

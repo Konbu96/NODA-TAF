@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CloseIcon } from "@/components/icons";
+import { CloseIcon, NextIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
-import { Label } from "@/components/ui";
+import { Label, PrimaryButton, Sheet } from "@/components/ui";
 import { canEditMenu } from "@/lib/permissions";
-import { saveOptions } from "@/lib/store";
+import { saveOptions, saveWarmUpDetail } from "@/lib/store";
 import type { DbState, PracticeOptions } from "@/lib/types";
 
 // 他の機能とつながっているので消せない選択肢
@@ -29,6 +29,8 @@ export default function OptionsPage() {
 function Body({ db }: { db: DbState }) {
   const [adding, setAdding] = useState<keyof PracticeOptions | null>(null);
   const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [detail, setDetail] = useState("");
   const o = db.options;
 
   const add = (k: keyof PracticeOptions) => {
@@ -49,7 +51,10 @@ function Body({ db }: { db: DbState }) {
                 {v}
                 {!FIXED.includes(v) && (
                   <button
-                    onClick={() => saveOptions({ ...o, [key]: o[key].filter((x) => x !== v) })}
+                    onClick={() => {
+                      saveOptions({ ...o, [key]: o[key].filter((x) => x !== v) });
+                      if (key === "warmUps") saveWarmUpDetail(v, "");
+                    }}
                     aria-label={`${v} を消す`}
                     className="flex h-7 w-7 items-center justify-center text-[#94A3B8]"
                   >
@@ -89,8 +94,49 @@ function Body({ db }: { db: DbState }) {
               </button>
             )}
           </div>
+          {key === "warmUps" && o.warmUps.length > 0 && (
+            <div className="mt-1 flex flex-col">
+              <p className="m-0 text-xs text-muted">中身を書いておくと、メニュー画面で押したときに開きます</p>
+              {o.warmUps.map((w) => {
+                const lines = (db.warmUpDetails[w] ?? "").split("\n").filter((l) => l.trim()).length;
+                return (
+                  <button
+                    key={w}
+                    onClick={() => {
+                      setEditing(w);
+                      setDetail(db.warmUpDetails[w] ?? "");
+                    }}
+                    className="flex min-h-11 items-center gap-2 border-t border-hair text-left text-[14px]"
+                  >
+                    <span className="grow">{w}</span>
+                    <span className={`text-xs ${lines ? "text-sub" : "text-muted"}`}>{lines ? `中身 ${lines}行` : "中身なし"}</span>
+                    <NextIcon className="text-line" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </section>
       ))}
+
+      <Sheet open={!!editing} onClose={() => setEditing(null)} title={`${editing ?? ""} の中身`}>
+        <p className="m-0 text-xs leading-relaxed text-muted">1行に1つ書きます。「・」で始めた行は、一段下げて表示されます。</p>
+        <textarea
+          value={detail}
+          onChange={(e) => setDetail(e.target.value)}
+          rows={12}
+          placeholder={"1. もも上げ 20m\n2. スキップ 20m\n・ゆっくり20 速く20"}
+          className="rounded-[10px] border border-line px-3 py-2.5 text-[15px] leading-[1.6]"
+        />
+        <PrimaryButton
+          onClick={async () => {
+            if (editing) await saveWarmUpDetail(editing, detail);
+            setEditing(null);
+          }}
+        >
+          保存する
+        </PrimaryButton>
+      </Sheet>
     </>
   );
 }

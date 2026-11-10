@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { SubShell } from "@/components/Shell";
-import { Card, chipOff, chipOn, Confirm, Label, PrimaryButton, Toast } from "@/components/ui";
+import { Card, chipOff, chipOn, Label, PrimaryButton, Toast } from "@/components/ui";
 import { gradeOf, GRADES, graduationYearFor, ROLE_LABEL, type Grade } from "@/lib/grade";
 import { canApprove, canChangeRole } from "@/lib/permissions";
-import { approveMember, removeMember, updateMember } from "@/lib/store";
+import { approveMember, updateMember } from "@/lib/store";
 import type { DbState, Member, Role } from "@/lib/types";
 
 export default function Page() {
@@ -18,11 +18,14 @@ export default function Page() {
 }
 
 function Inner() {
-  const id = useSearchParams().get("id") ?? "";
+  const params = useSearchParams();
+  const id = params.get("id") ?? "";
+  // 部員のページから来たときは、そこへ戻る
+  const back = params.get("from") === "detail" ? `/members/detail?id=${encodeURIComponent(id)}` : "/admin/members";
   return (
-    <SubShell title="部員の編集" back="/admin/members">
+    <SubShell title="部員の編集" back={back}>
       {(ctx) => {
-        if (!canApprove(ctx.me)) return <p className="text-sm text-sub">ここを使えるのは顧問とキャプテンだけです。</p>;
+        if (!canApprove(ctx.me)) return <p className="text-sm text-sub">ここを使えるのは顧問・キャプテン・マネージャーだけです。</p>;
         const target = ctx.db.members[id];
         if (!target) return <p className="text-sm text-sub">部員が見つかりません。</p>;
         return <Form key={id} {...ctx} target={target} />;
@@ -34,11 +37,9 @@ function Inner() {
 const ROLES: Role[] = ["member", "captain", "viceCaptain", "manager", "adviser"];
 
 function Form({ me, today, target }: { db: DbState; me: Member; today: string; target: Member }) {
-  const router = useRouter();
   const [name, setName] = useState(target.name);
   const [grade, setGrade] = useState<Grade | null>(gradeOf(target.graduationYear, today));
   const [role, setRole] = useState<Role>(target.role);
-  const [askRemove, setAskRemove] = useState(false);
   const [toast, setToast] = useState("");
   const pending = target.status === "pending";
   const roleEditable = canChangeRole(me);
@@ -113,24 +114,6 @@ function Form({ me, today, target }: { db: DbState; me: Member; today: string; t
           <PrimaryButton onClick={save} disabled={!name.trim()}>
             保存する
           </PrimaryButton>
-          {target.email !== me.email &&
-            (askRemove ? (
-              <Confirm
-                danger
-                title={`${target.name} を名簿から外しますか？`}
-                note="記録や振り返りも消え、元に戻せません"
-                okLabel="外す"
-                onCancel={() => setAskRemove(false)}
-                onOk={async () => {
-                  await removeMember(target.email);
-                  router.push("/admin/members");
-                }}
-              />
-            ) : (
-              <button onClick={() => setAskRemove(true)} className="h-10 text-[13px] text-danger underline">
-                名簿から外す
-              </button>
-            ))}
         </>
       )}
 

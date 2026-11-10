@@ -7,7 +7,7 @@ import { SubShell } from "@/components/Shell";
 import { Card, chipOff, chipOn, PrimaryButton } from "@/components/ui";
 import { monthLabel } from "@/lib/dates";
 import { reflectionStatus } from "@/lib/derived";
-import { isAthlete } from "@/lib/permissions";
+import { writesReflection } from "@/lib/permissions";
 import { submitReflection } from "@/lib/store";
 import type { DbState, Member } from "@/lib/types";
 
@@ -33,7 +33,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
   const [q4, setQ4] = useState("");
   const [sent, setSent] = useState(false);
 
-  if (!isAthlete(me)) return <p className="text-sm text-sub">振り返りは部員だけが書きます。</p>;
+  if (!writesReflection(me)) return <p className="text-sm text-sub">振り返りは選手だけが書きます。</p>;
   if (sent || r.submitted) {
     return (
       <Card className="flex flex-col items-center gap-3 py-8 text-center">

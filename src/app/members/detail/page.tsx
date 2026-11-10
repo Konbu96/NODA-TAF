@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { PencilIcon } from "@/components/icons";
+import { NextIcon, PencilIcon } from "@/components/icons";
 import { MoodFace } from "@/components/MoodFace";
 import { SubShell } from "@/components/Shell";
 import { Card, Label, RefMark } from "@/components/ui";
 import { monthLabel, nextMonth, shortDate } from "@/lib/dates";
 import { reflectionStatus } from "@/lib/derived";
 import { windLabel } from "@/lib/marks";
-import { canEditProfileOf, canEditRecordsOf } from "@/lib/permissions";
+import { ROLE_LABEL } from "@/lib/grade";
+import { canChangeRole, canEditProfileOf, canEditRecordsOf, hasEvents, writesReflection } from "@/lib/permissions";
 import type { DbState, Member } from "@/lib/types";
 
 export default function Page() {
@@ -24,11 +25,7 @@ export default function Page() {
 function Inner() {
   const id = useSearchParams().get("id") ?? "";
   return (
-    <SubShell
-      title="部員"
-      back="/members"
-      right={({ me }) => (canEditProfileOf(me, id) ? <EditLink id={id} /> : null)}
-    >
+    <SubShell title="部員" back="/members">
       {(ctx) => {
         const target = ctx.db.members[id];
         if (!target || target.status !== "approved") return <p className="text-sm text-sub">部員が見つかりません。</p>;
@@ -40,8 +37,13 @@ function Inner() {
 
 function EditLink({ id }: { id: string }) {
   return (
-    <Link href={`/profile/edit?id=${encodeURIComponent(id)}`} aria-label="プロフィールを直す" className="flex h-11 w-11 items-center justify-center text-white">
-      <PencilIcon />
+    <Link
+      href={`/profile/edit?id=${encodeURIComponent(id)}`}
+      aria-label="プロフィールを直す"
+      className="flex h-11 shrink-0 items-center gap-1 rounded-full bg-accent-soft px-3 text-[13px] font-bold text-accent"
+    >
+      <PencilIcon size={16} />
+      編集
     </Link>
   );
 }
@@ -61,32 +63,40 @@ function Body({ db, me, today, target }: { db: DbState; me: Member; today: strin
     <>
       <Card className="flex items-center gap-3">
         {mood ? <MoodFace kind={mood.mood} size={44} /> : <span className="h-11 w-11 rounded-full bg-hair" />}
-        <div>
+        <div className="min-w-0 grow">
           <p className="m-0 text-lg font-bold">{target.name}</p>
           <p className="mt-0.5 mb-0 text-[13px] text-sub">
-            {[target.bibNumber && `ゼッケン ${target.bibNumber}`, target.events.join(" / ")].filter(Boolean).join("・")}
+            {hasEvents(target) ? [target.bibNumber && `ゼッケン ${target.bibNumber}`, target.events.join(" / ")].filter(Boolean).join("・") : ROLE_LABEL[target.role]}
           </p>
+          {(target.gender || target.restDay) && (
+            <p className="mt-0.5 mb-0 text-xs text-muted">{[target.gender, target.restDay && `休み ${target.restDay}`].filter(Boolean).join("・")}</p>
+          )}
         </div>
+        {canEditProfileOf(me, target.email) && <EditLink id={target.email} />}
       </Card>
 
-      <Card className="py-3">
-        <p className="m-0 text-xs text-sub">{monthLabel(nextMonth(month))}の目標</p>
-        <p className={`mt-1 mb-0 text-[15px] font-bold ${goal ? "" : "text-warn-dark"}`}>{goal ?? "未提出"}</p>
-      </Card>
+      {writesReflection(target) && (
+        <Card className="py-3">
+          <p className="m-0 text-xs text-sub">{monthLabel(nextMonth(month))}の目標</p>
+          <p className={`mt-1 mb-0 text-[15px] font-bold ${goal ? "" : "text-warn-dark"}`}>{goal ?? "未提出"}</p>
+        </Card>
+      )}
 
-      <Card className="flex flex-col gap-2">
-        <Label>PB</Label>
-        {target.personalBests.length === 0 && <p className="m-0 text-sm text-muted">まだありません</p>}
-        {target.personalBests.map((p) => (
-          <div key={p.event} className="flex justify-between text-[15px]">
-            <span>{p.event}</span>
-            <span>
-              {p.isWindAssisted && <RefMark small />}
-              {p.mark}
-            </span>
-          </div>
-        ))}
-      </Card>
+      {hasEvents(target) && (
+        <Card className="flex flex-col gap-2">
+          <Label>PB</Label>
+          {target.personalBests.length === 0 && <p className="m-0 text-sm text-muted">まだありません</p>}
+          {target.personalBests.map((p) => (
+            <div key={p.event} className="flex justify-between text-[15px]">
+              <span>{p.event}</span>
+              <span>
+                {p.isWindAssisted && <RefMark small />}
+                {p.mark}
+              </span>
+            </div>
+          ))}
+        </Card>
+      )}
 
       <Card className="flex flex-col gap-2">
         <Label>スタブロのベスト</Label>
@@ -128,6 +138,17 @@ function Body({ db, me, today, target }: { db: DbState; me: Member; today: strin
           </button>
         )}
       </Card>
+
+      {/* 名前・学年・役職（顧問・開発者） */}
+      {canChangeRole(me) && (
+        <Link
+          href={`/admin/members/edit?id=${encodeURIComponent(target.email)}&from=detail`}
+          className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-4 text-[15px]"
+        >
+          <span className="grow">名前・学年・役職を直す</span>
+          <NextIcon className="text-line" />
+        </Link>
+      )}
     </>
   );
 }

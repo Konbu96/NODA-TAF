@@ -1,5 +1,5 @@
 import { diffDays, reflectionMonth, prevMonth } from "./dates";
-import { canApprove, isAthlete } from "./permissions";
+import { canApprove, isAthlete, writesReflection } from "./permissions";
 import type { DbState, Member, Meet } from "./types";
 
 // いくつかの画面で使う計算
@@ -42,7 +42,7 @@ export function reflectionStatus(db: DbState, me: Member, today: string) {
   const month = reflectionMonth(today);
   const submitted = !!db.reflections[`${month}_${me.email}`];
   const lastMonth = prevMonth(month);
-  return { month, lastMonth, submitted, needed: isAthlete(me) && !submitted };
+  return { month, lastMonth, submitted, needed: writesReflection(me) && !submitted };
 }
 
 /** 角の印：管理（承認待ち）・大会（入力待ち）・マイページ（振り返り） */

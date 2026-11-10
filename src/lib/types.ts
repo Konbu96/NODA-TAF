@@ -22,6 +22,10 @@ export type Member = {
   isAdmin: boolean;
   graduationYear: number | null;
   bibNumber: string;
+  /** 「男」「女」。まだ選んでいなければ空 */
+  gender: string;
+  /** 休みの曜日（例：「月曜日」）。まだ選んでいなければ空 */
+  restDay: string;
   events: string[];
   personalBests: PersonalBest[];
   stabroBests: Partial<Record<StabroDistance, number>>;
@@ -120,6 +124,8 @@ export type DbState = {
   menus: Record<string, PracticeMenu>;
   attendance: Record<string, Record<string, Attendance>>;
   options: PracticeOptions;
+  /** アップの選択肢ごとの中身（例：「アクティベーション」→ 種目の一覧）。書いていないものは無い */
+  warmUpDetails: Record<string, string>;
   fees: Fees;
   winter: Winter;
   sheetsUrl: string;

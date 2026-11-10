@@ -11,6 +11,7 @@ import { kindOf, liveMark, liveWind, markToDigits, onlyDigits, parseMark, WIND_E
 import { canEditRecordsOf } from "@/lib/permissions";
 import { saveRecords, type PbUpdate, type RecordInput } from "@/lib/store";
 import type { DbState, Meet, Member } from "@/lib/types";
+import { familyName } from "@/lib/names";
 
 export default function Page() {
   return (
@@ -81,7 +82,7 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
       <Card className="flex flex-col gap-0.5">
         <p className="m-0 text-[17px] font-bold">{meet.name}</p>
         <p className="m-0 text-[13px] text-sub">{dayLabel(meet.startDate)}</p>
-        {target.email !== me.email && <p className="mt-1 mb-0 text-sm font-bold">{target.name} さんの記録</p>}
+        {target.email !== me.email && <p className="mt-1 mb-0 text-sm font-bold">{familyName(target.name)}の記録</p>}
       </Card>
 
       <div role="tablist" aria-label="種目" className="flex gap-1.5">

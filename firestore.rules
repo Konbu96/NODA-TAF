@@ -1,0 +1,152 @@
+rules_version = '2';
+
+// Firestore のセキュリティルール（だれが何を読めて、何を書けるか）。
+// docs/07_data-model.md の「5. 権限のまとめ」と src/lib/permissions.ts に合わせている。
+// 直したら、Firebase の画面の Firestore →「ルール」に貼り付けて「公開」する。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- ログイン中の人 ----------
+
+    // メールアドレスとパスワードでログインした人（確認メールは送らないので、確認済みかは見ない）
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function meRef() { return /databases/$(database)/documents/members/$(myEmail()); }
+    function me() { return get(meRef()).data; }
+    function isSelf(email) { return signedIn() && email == myEmail(); }
+
+    // 承認済みの部員（顧問を含む）
+    function approved() { return signedIn() && exists(meRef()) && me().status == 'approved'; }
+    // 顧問・開発者
+    function adviser() { return approved() && (me().role == 'adviser' || me().isAdmin == true); }
+    // 部員名簿：部員の登録・入部の承認・部員の削除
+    function approver() { return adviser() || (approved() && me().role in ['captain', 'manager']); }
+    // 練習メニュー・選択肢・大会・エントリー・参加
+    function menuEditor() { return adviser() || (approved() && me().role in ['captain', 'viceCaptain', 'manager']); }
+    // ほかの人のゼッケン・専門種目・PB・大会記録
+    function recordEditor() { return adviser() || (approved() && me().role in ['captain', 'manager']); }
+
+    function changesOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function newData() { return request.resource.data; }
+
+    // ---------- 部員名簿 ----------
+
+    match /members/{email} {
+      allow read: if approved() || isSelf(email);
+
+      // 入部申請（本人だけ。承認待ち・部員・開発者でない、に固定）。
+      // 顧問は名簿に登録できる。キャプテン・マネージャーも登録できるが、顧問・開発者としては登録できない
+      allow create: if adviser()
+        || (approver() && newData().email == email && newData().role != 'adviser' && newData().isAdmin == false)
+        || (isSelf(email)
+          && newData().email == email
+          && newData().status == 'pending'
+          && newData().role == 'member'
+          && newData().isAdmin == false);
+
+      allow update: if adviser()
+        // キャプテン・マネージャー：承認・却下と、名前・学年の修正（役職と開発者は変えられない）
+        || (approver() && changesOnly(['status', 'name', 'graduationYear', 'updatedAt',
+              'bibNumber', 'gender', 'restDay', 'events', 'personalBests', 'stabroBests']))
+        // 本人・マネージャーなど：プロフィール
+        || (((isSelf(email) && approved()) || recordEditor())
+            && changesOnly(['bibNumber', 'gender', 'restDay', 'events', 'personalBests', 'stabroBests', 'updatedAt']))
+        // スタブロは誰の分でも測った人が入力できるので、ベストはだれでも更新できる
+        || (approved() && changesOnly(['stabroBests', 'updatedAt']));
+
+      // 削除：顧問・キャプテン・マネージャー（顧問・開発者を消せるのは顧問だけ）。
+      // 却下された人は、申請し直すために自分の分を消せる
+      allow delete: if adviser()
+        || (approver() && resource.data.role != 'adviser' && resource.data.isAdmin != true)
+        || (isSelf(email) && resource.data.status == 'rejected');
+    }
+
+    // ---------- 練習メニュー ----------
+
+    match /practiceMenus/{date} {
+      allow read: if approved();
+      allow write: if menuEditor();
+
+      match /attendance/{email} {
+        allow write: if menuEditor() || (approved() && isSelf(email));
+      }
+    }
+    match /{path=**}/attendance/{email} {
+      allow read: if approved();
+    }
+
+    match /practiceOptions/{id} {
+      allow read: if approved();
+      allow write: if menuEditor();
+    }
+
+    // fees・sheets は顧問だけ。winter（冬季料金のオン／オフ）はだれでも切りかえられる
+    match /settings/{id} {
+      allow read: if approved();
+      allow write: if adviser() || (id == 'winter' && approved());
+    }
+
+    // ---------- 大会・記録 ----------
+
+    match /records/{id} {
+      allow read: if approved();
+      allow create: if recordEditor() || (approved() && newData().memberId == myEmail());
+      allow update: if recordEditor()
+        || (approved() && resource.data.memberId == myEmail() && newData().memberId == myEmail())
+        // 大会名・日付を直したときに、その大会の記録にもコピーする
+        || (menuEditor() && changesOnly(['meetName', 'date']));
+      allow delete: if recordEditor() || (approved() && resource.data.memberId == myEmail());
+    }
+
+    match /meets/{id} {
+      allow read: if approved();
+      allow write: if menuEditor();
+
+      match /entries/{email} {
+        allow write: if menuEditor() || (approved() && isSelf(email));
+      }
+    }
+    match /{path=**}/entries/{email} {
+      allow read: if approved();
+    }
+
+    // ---------- 振り返り・目標・気分・スタブロ ----------
+
+    // 振り返り：本人だけが読める。提出したら直せない
+    match /reflections/{id} {
+      allow read: if signedIn() && resource.data.memberId == myEmail();
+      allow create: if approved()
+        && newData().memberId == myEmail()
+        && id == newData().month + '_' + myEmail();
+    }
+
+    match /goals/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && newData().memberId == myEmail()
+        && id == newData().month + '_' + myEmail();
+      allow delete: if approver();
+    }
+
+    // 気分：その日の分を作るだけ（上書きできない）
+    match /moods/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && newData().memberId == myEmail()
+        && id == newData().date + '_' + myEmail();
+      allow delete: if approver();
+    }
+
+    match /stabroSessions/{id} {
+      allow read: if approved();
+      allow create, update: if approved();
+      allow delete: if recordEditor()
+        || (approved() && (resource.data.memberId == myEmail() || resource.data.enteredBy == myEmail()));
+    }
+  }
+}

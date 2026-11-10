@@ -9,6 +9,7 @@ import { EVENT_GROUPS } from "@/lib/marks";
 import { canEditMenu } from "@/lib/permissions";
 import { saveEntry } from "@/lib/store";
 import type { DbState, Meet, Member } from "@/lib/types";
+import { familyName } from "@/lib/names";
 
 export default function Page() {
   return (
@@ -48,7 +49,7 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
         <p className="m-0 text-[17px] font-bold">{meet.name}</p>
         <p className="m-0 text-[13px] text-sub">{rangeLabel(meet.startDate, meet.endDate)}</p>
       </Card>
-      {target.email !== me.email && <p className="m-0 px-1 text-sm font-bold">{target.name} さんのエントリー</p>}
+      {target.email !== me.email && <p className="m-0 px-1 text-sm font-bold">{familyName(target.name)}のエントリー</p>}
       {target.events.length > 0 && (
         <Card className="flex flex-col gap-2">
           <Label>専門種目</Label>

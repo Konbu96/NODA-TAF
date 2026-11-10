@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase の鍵（サービスアカウント）。絶対に GitHub に上げない
+/secrets/
+*-firebase-adminsdk-*.json

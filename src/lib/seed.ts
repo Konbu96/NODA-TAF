@@ -2,11 +2,22 @@ import { addDays, nowIso, prevMonth, reflectionMonth } from "./dates";
 import { graduationYearFor, type Grade } from "./grade";
 import { parseMark } from "./marks";
 import { recomputeAllPBs } from "./pb";
-import type { DbState, Member, MoodKind, RecordDoc, Role, StabroSession } from "./types";
+import type { DbState, Fees, Member, MoodKind, PracticeOptions, RecordDoc, Role, StabroSession } from "./types";
+import { WARM_UP_DETAILS } from "./warmUpSeed";
 
 // お試し用のデータ。今日の日付をもとに作るので、いつ開いても動きを試せる。
 
 export const DEMO_ME = "you@example.com";
+
+/** メニューの選択肢と料金の最初の中身（本番でも、まだ保存されていなければこれを使う） */
+export const DEFAULT_OPTIONS: PracticeOptions = {
+  places: ["学校", "競技場"],
+  warmUps: ["倒立・体幹", "10種", "動き作り", "アクティベーション", "ハードルドリル", "マークドリル"],
+  types: ["専門", "テンポ走", "スタブロ", "並走バトン", "台ドロップ", "補強 5分間腹筋", "補強 腿上げ＋補強 10分間", "補強 2分間腹筋"],
+  distances: ["100m", "120m", "150m", "200m", "250m", "300m"],
+};
+
+export const DEFAULT_FEES: Fees = { juniorHigh: 60, highSchool: 120, winterExtra: 50 };
 
 type P = { name: string; grade: Grade | null; role?: Role; events?: string[]; bib?: string; admin?: boolean; email?: string; status?: Member["status"] };
 
@@ -43,6 +54,8 @@ const PEOPLE: P[] = [
   { name: "岡田 実", grade: "中1", status: "pending", email: "apply2@example.com" },
 ];
 
+const REST_DAYS = ["月曜日", "水曜日", "金曜日"];
+
 const MOODS: MoodKind[] = ["great", "good", "normal", "sleepy", "tired", "legPain", "sick"];
 
 export function createSeed(today: string): DbState {
@@ -58,6 +71,8 @@ export function createSeed(today: string): DbState {
       isAdmin: !!p.admin,
       graduationYear: p.grade ? graduationYearFor(p.grade, today) : null,
       bibNumber: p.bib ?? "",
+      gender: p.grade ? (i % 2 ? "女" : "男") : "",
+      restDay: p.grade && p.status !== "pending" ? REST_DAYS[i % 3] : "",
       events: p.events ?? [],
       personalBests: [],
       stabroBests: {},
@@ -78,14 +93,10 @@ export function createSeed(today: string): DbState {
     members,
     menus: {},
     attendance: {},
-    options: {
-      places: ["学校", "競技場"],
-      warmUps: ["倒立・体幹", "10種", "動き作り", "アクティベーションドリル", "ハードルドリル", "マークドリル"],
-      types: ["専門", "テンポ走", "スタブロ", "並走バトン", "台ドロップ", "補強 5分間腹筋", "補強 腿上げ＋補強 10分間", "補強 2分間腹筋"],
-      distances: ["100m", "120m", "150m", "200m", "250m", "300m"],
-    },
-    fees: { juniorHigh: 60, highSchool: 120, winterExtra: 50 },
+    options: DEFAULT_OPTIONS,
+    fees: DEFAULT_FEES,
     winter: { isOn: false, updatedBy: "", updatedAt: now },
+    warmUpDetails: { ...WARM_UP_DETAILS },
     sheetsUrl: "",
     records: {},
     meets: {},
@@ -117,7 +128,7 @@ export function createSeed(today: string): DbState {
     note: "スパイク持参", isStadium: true, hasStabro: true, ...base,
   };
   state.menus[addDays(today, 1)] = {
-    date: addDays(today, 1), place: "学校", warmUp: ["倒立・体幹", "10種"],
+    date: addDays(today, 1), place: "学校", warmUp: ["倒立・体幹", "アクティベーション"],
     items: [
       { type: "台ドロップ", distance: "", reps: 0, sets: 3, memo: "" },
       { type: "専門", distance: "", reps: 0, sets: 0, memo: "" },
@@ -227,7 +238,7 @@ export function createSeed(today: string): DbState {
   submit(DEMO_ME, pm2, "100m で 12 秒 1 を出す", 2, `${pm2}-27`);
   submit(DEMO_ME, pm, "100m で 12 秒台を出す", 4, `${pm}-25`);
   athletes.forEach((m, i) => {
-    if (m.email === DEMO_ME) return;
+    if (m.email === DEMO_ME || m.role === "manager") return;
     submit(m.email, pm, goalTexts[i % goalTexts.length], (i % 5) + 1, `${pm}-26`);
     if (i % 4 !== 1) submit(m.email, rm, goalTexts[(i + 3) % goalTexts.length], ((i + 2) % 5) + 1, `${rm}-26`);
   });
