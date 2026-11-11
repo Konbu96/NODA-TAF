@@ -1,11 +1,15 @@
 import type { MetadataRoute } from "next";
 
-export default function manifest(): MetadataRoute.Manifest {
+// handle_links：Android でアプリを入れた人が、ほかのアプリのリンクから開いたときにアプリで開く
+export default function manifest(): MetadataRoute.Manifest & { handle_links: string } {
   return {
+    id: "/",
     name: "野田陸上部",
     short_name: "野田陸上部",
     start_url: "/",
     display: "standalone",
+    handle_links: "preferred",
+    launch_handler: { client_mode: "navigate-existing" },
     background_color: "#F1F5F9",
     theme_color: "#1E3A8A",
     icons: [
