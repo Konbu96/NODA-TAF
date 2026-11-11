@@ -1,3 +1,4 @@
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { PushSubscription } from "web-push";
 
 // 通知を送るサーバーの処理（Vercel で動く）。
@@ -13,10 +14,18 @@ export const runtime = "nodejs";
 // 読み込みに失敗したときに理由を返せるよう、使うときに読み込む
 async function admin() {
   const { cert, getApps, initializeApp } = await import("firebase-admin/app");
-  const { getAuth } = await import("firebase-admin/auth");
   const { getFirestore } = await import("firebase-admin/firestore");
   const app = getApps()[0] ?? initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT ?? "{}")) });
-  return { auth: getAuth(app), db: getFirestore(app) };
+  return { db: getFirestore(app) };
+}
+
+// ログインの確認（firebase-admin/auth は Vercel で読み込めないので、Google の公開鍵で直接確かめる）
+const GOOGLE_KEYS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
+
+async function verifyEmail(token: string, projectId: string): Promise<string> {
+  const { payload } = await jwtVerify(token, GOOGLE_KEYS, { issuer: `https://securetoken.google.com/${projectId}`, audience: projectId });
+  if (!payload.sub || typeof payload.email !== "string") throw new Error("bad token");
+  return payload.email.toLowerCase();
 }
 
 /** 動いているかの確認用（鍵の中身は返さない） */
@@ -60,9 +69,9 @@ export async function POST(req: Request) {
   }
   const missing = ["project_id", "client_email", "private_key"].filter((k) => typeof parsed?.[k] !== "string");
   if (missing.length) return Response.json({ error: `FIREBASE_SERVICE_ACCOUNT に ${missing.join("・")} がありません`, keys: Object.keys(parsed ?? {}) }, { status: 500 });
-  let auth, db;
+  let db;
   try {
-    ({ auth, db } = await admin());
+    ({ db } = await admin());
   } catch (e) {
     return Response.json({ error: `Firebase の準備に失敗しました：${(e as Error).message.slice(0, 120)}` }, { status: 500 });
   }
@@ -71,7 +80,7 @@ export async function POST(req: Request) {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "");
   let email = "";
   try {
-    email = ((await auth.verifyIdToken(token)).email ?? "").toLowerCase();
+    email = await verifyEmail(token, parsed.project_id as string);
   } catch {
     return Response.json({ error: "ログインし直してください" }, { status: 401 });
   }
