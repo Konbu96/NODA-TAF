@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
+import { AppSetup } from "@/components/AppSetup";
 import { EnterToSave } from "@/components/EnterToSave";
 import { PageSlide } from "@/components/PageSlide";
 import { PageTransition } from "@/components/PageTransition";
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <PageSlide>{children}</PageSlide>
         </div>
         <EnterToSave />
+        <AppSetup />
         <PageTransition />
       </body>
     </html>

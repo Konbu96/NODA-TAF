@@ -6,7 +6,7 @@ import {
   type Auth,
 } from "firebase/auth";
 import {
-  collection, collectionGroup, doc, initializeFirestore, onSnapshot, query, where, writeBatch,
+  collection, collectionGroup, deleteDoc, doc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, query, setDoc, where, writeBatch,
   type DocumentData, type Firestore, type QuerySnapshot, type Unsubscribe,
 } from "firebase/firestore";
 import { nowIso } from "./dates";
@@ -41,7 +41,11 @@ function init() {
       appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     });
   auth = getAuth(app);
-  fs = initializeFirestore(app, { ignoreUndefinedProperties: true });
+  // データをスマホの中にも残して、電波がないときも前に見たものを出す
+  fs = initializeFirestore(app, {
+    ignoreUndefinedProperties: true,
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
   return { auth, fs };
 }
 
@@ -305,4 +309,21 @@ export async function writeDiff(prev: DbState, next: DbState): Promise<boolean> 
     console.error("保存できませんでした", ops.map((o) => o.path), e);
     return false;
   }
+}
+
+// ---------- 通知 ----------
+
+/** 通知の送り先（このスマホ）を保存する。id は送り先のアドレスから作る */
+export function savePushSubscription(id: string, email: string, subscription: PushSubscriptionJSON) {
+  return setDoc(doc(init().fs, "pushSubscriptions", id), { email, subscription, updatedAt: nowIso() });
+}
+
+export function deletePushSubscription(id: string) {
+  return deleteDoc(doc(init().fs, "pushSubscriptions", id));
+}
+
+/** サーバー（/api）に「本人です」と伝えるための証明 */
+export async function idToken(): Promise<string | null> {
+  const u = init().auth.currentUser;
+  return u ? u.getIdToken() : null;
 }

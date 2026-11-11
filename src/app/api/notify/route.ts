@@ -1,0 +1,83 @@
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
+import * as webpush from "web-push";
+
+// 通知を送るサーバーの処理（Vercel で動く）。
+// アプリから「メニューを登録した」などと頼まれたら、頼んだ人が本当に担当者かを確かめて、
+// 保存されている全員の送り先（pushSubscriptions）に通知を送る。
+//
+// Vercel の Environment Variables に入れておくもの（GitHub には上げない）：
+//   FIREBASE_SERVICE_ACCOUNT … Firebase のサービスアカウントの鍵（JSON の中身をそのまま）
+//   NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY … 通知の鍵（.env.local と同じもの）
+
+export const runtime = "nodejs";
+
+function admin() {
+  const app =
+    getApps()[0] ??
+    initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT ?? "{}")) });
+  return { auth: getAuth(app), db: getFirestore(app) };
+}
+
+/** メニューを登録できる役職（src/lib/permissions.ts の canEditMenu と同じ） */
+const MENU_ROLES = ["adviser", "captain", "viceCaptain", "manager"];
+const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** 2026-11-14 → 11/14（土） */
+function dayText(date: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  const w = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${m}/${d}（${WEEK[w]}）`;
+}
+
+export async function POST(req: Request) {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    return Response.json({ error: "通知の設定がまだです" }, { status: 503 });
+  }
+  const { auth, db } = admin();
+
+  // 頼んだ人を確かめる
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "");
+  let email = "";
+  try {
+    email = ((await auth.verifyIdToken(token)).email ?? "").toLowerCase();
+  } catch {
+    return Response.json({ error: "ログインし直してください" }, { status: 401 });
+  }
+  const me = (await db.doc(`members/${email}`).get()).data();
+  if (!me || me.status !== "approved") return Response.json({ error: "部員ではありません" }, { status: 403 });
+
+  const body = (await req.json().catch(() => ({}))) as { kind?: string; date?: string; isNew?: boolean };
+  let message: { title: string; body: string; url: string; tag: string };
+  if (body.kind === "menu" && typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+    if (!(me.isAdmin === true || MENU_ROLES.includes(me.role))) return Response.json({ error: "担当者ではありません" }, { status: 403 });
+    message = {
+      title: "練習メニュー",
+      body: `${dayText(body.date)}の練習メニューが${body.isNew ? "登録" : "変更"}されました`,
+      url: "/",
+      tag: `menu-${body.date}`,
+    };
+  } else {
+    return Response.json({ error: "知らせる内容がわかりません" }, { status: 400 });
+  }
+
+  webpush.setVapidDetails("https://noda-taf.vercel.app", process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+  const subs = await db.collection("pushSubscriptions").get();
+  let sent = 0;
+  await Promise.all(
+    subs.docs.map(async (d) => {
+      const s = d.data() as { email: string; subscription: webpush.PushSubscription };
+      if (s.email === email) return; // 自分には送らない
+      try {
+        await webpush.sendNotification(s.subscription, JSON.stringify(message), { TTL: 60 * 60 * 24 });
+        sent++;
+      } catch (e) {
+        // もう使われていない送り先は消す
+        const code = (e as { statusCode?: number }).statusCode;
+        if (code === 404 || code === 410) await d.ref.delete().catch(() => {});
+      }
+    }),
+  );
+  return Response.json({ sent });
+}

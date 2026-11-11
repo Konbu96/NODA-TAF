@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DownIcon, NextIcon, PlusIcon } from "@/components/icons";
 import { LineChart } from "@/components/LineChart";
 import { MoodFace, NoMoodFace } from "@/components/MoodFace";
@@ -16,6 +16,8 @@ import { gradeOf, ROLE_LABEL } from "@/lib/grade";
 import { formatValue, lowerIsBetter, showMark } from "@/lib/marks";
 import { isAthlete, writesReflection } from "@/lib/permissions";
 import { addWarmUp, logout, saveWarmUpDetail } from "@/lib/store";
+import { USE_FIREBASE } from "@/lib/firebase";
+import { disablePush, enablePush, pushState, type PushState } from "@/lib/push";
 import type { DbState, Member } from "@/lib/types";
 
 export default function MyPage() {
@@ -128,6 +130,8 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
         </Card>
       )}
 
+      {USE_FIREBASE && <NotifyCard email={me.email} />}
+
       {askLogout ? (
         <Confirm
           danger
@@ -229,6 +233,52 @@ function WarmUpDetails({ db, today }: { db: DbState; today: string }) {
           保存する
         </PrimaryButton>
       </Sheet>
+    </Card>
+  );
+}
+
+/** 通知のオン／オフ（このスマホで受け取るか） */
+function NotifyCard({ email }: { email: string }) {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    pushState().then(setState);
+  }, []);
+  if (!state || state === "unsupported") return null;
+
+  const note: Record<PushState, string> = {
+    on: "練習メニューが登録・変更されたときに通知が届きます。",
+    off: "オンにすると、練習メニューが登録・変更されたときに通知が届きます。",
+    denied: "通知が止められています。スマホの「設定」→ 通知 から、このアプリの通知を許可してください。",
+    needInstall: "ホーム画面に追加したアプリから開くと、通知をオンにできます。",
+    unsupported: "",
+  };
+  return (
+    <Card className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label>通知</Label>
+        {(state === "on" || state === "off") && (
+          <button
+            role="switch"
+            aria-checked={state === "on"}
+            aria-label="通知を受け取る"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                setState(state === "on" ? await disablePush() : await enablePush(email));
+              } catch {
+                setState(await pushState());
+              }
+              setBusy(false);
+            }}
+            className={`relative h-8 w-14 shrink-0 rounded-full transition-colors disabled:opacity-50 ${state === "on" ? "bg-accent" : "bg-line"}`}
+          >
+            <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${state === "on" ? "left-7" : "left-1"}`} />
+          </button>
+        )}
+      </div>
+      <p className="m-0 text-[13px] leading-relaxed text-sub">{note[state]}</p>
     </Card>
   );
 }

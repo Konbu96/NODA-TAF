@@ -9,6 +9,7 @@ import { dayLabel, diffDays } from "@/lib/dates";
 import { itemSummary, needsDetail } from "@/lib/menuText";
 import { canEditMenu } from "@/lib/permissions";
 import { deleteMenu, saveMenu } from "@/lib/store";
+import { notifyMenu } from "@/lib/push";
 import type { DbState, MenuItem, Member } from "@/lib/types";
 
 export default function Page() {
@@ -55,6 +56,8 @@ function Form({ db, me, date }: { db: DbState; me: Member; date: string }) {
 
   const save = async () => {
     await saveMenu({ date, place, warmUp: warm, items, note }, me.email);
+    // みんなに通知する（送れなくても保存はできている）
+    notifyMenu(date, !existing);
     router.push("/");
   };
 

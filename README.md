@@ -43,3 +43,15 @@ npm run dev
 | `src/lib/seed.ts` | お試し用のデータ |
 | `src/lib/marks.ts` | 種目の一覧と、記録の書き方（1148 → 11.48 など） |
 | `src/lib/permissions.ts` | 役職ごとにできること |
+
+## 通知（Web Push）の設定
+
+通知は Vercel のサーバー（`src/app/api/notify/route.ts`）から送る。Vercel の **Settings → Environment Variables** に次の 3 つを入れて、入れたあとに Redeploy する。どれも GitHub には上げない。
+
+| 名前 | 中身 |
+| --- | --- |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase → プロジェクトの設定 → サービスアカウント →「新しい秘密鍵を生成」でできる JSON ファイルの中身を全部 |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | `.env.local` の同じ名前の値 |
+| `VAPID_PRIVATE_KEY` | `.env.local` の同じ名前の値（秘密） |
+
+通知の送り先は Firestore の `pushSubscriptions` に保存する。ルール（`firestore.rules`）を貼り直すこと。
