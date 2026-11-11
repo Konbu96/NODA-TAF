@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PencilIcon } from "./icons";
 
 // 画面で何度も使う小さな部品
@@ -70,6 +70,11 @@ export function EditButton({
   );
 }
 
+/** 役職の札（名前の横に出す） */
+export function RoleTag({ label }: { label: string }) {
+  return <span className="shrink-0 rounded-md bg-accent-soft px-1.5 py-0.5 text-[11px] leading-none font-bold text-accent">{label}</span>;
+}
+
 export function PrimaryLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} className="flex h-[52px] w-full items-center justify-center rounded-xl bg-accent text-base font-bold text-white">
@@ -105,18 +110,37 @@ export function Toast({
 export function Sheet({
   open, onClose, title, children,
 }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  if (!open) return null;
+  // 閉じるときも、下にすっと戻ってから消す。そのあいだは開いていたときの中身をそのまま見せる
+  const [closing, setClosing] = useState(false);
+  const last = useRef<{ title: string; children: ReactNode } | null>(null);
+  const wasOpen = useRef(open);
+  if (open) last.current = { title, children };
+
+  useEffect(() => {
+    if (wasOpen.current && !open) {
+      setClosing(true);
+      const t = setTimeout(() => setClosing(false), 220);
+      wasOpen.current = open;
+      return () => clearTimeout(t);
+    }
+    wasOpen.current = open;
+    if (open) setClosing(false);
+  }, [open]);
+
+  if (!open && !closing) return null;
+  const shown = open ? { title, children } : last.current;
+  if (!shown) return null;
   return (
-    <div className="fixed inset-0 z-50 mx-auto max-w-[480px]">
-      <button aria-label="閉じる" onClick={onClose} className="anim-fade absolute inset-0 bg-ink/45" />
+    <div className={`fixed inset-0 z-50 mx-auto max-w-[480px] ${closing ? "pointer-events-none" : ""}`}>
+      <button aria-label="閉じる" onClick={onClose} className={`${closing ? "anim-fade-out" : "anim-fade"} absolute inset-0 bg-ink/45`} />
       <section
         role="dialog"
-        aria-label={title}
-        className="anim-sheet absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col gap-3.5 overflow-y-auto rounded-t-[20px] bg-white text-ink px-5 pt-2.5 pb-7"
+        aria-label={shown.title}
+        className={`${closing ? "anim-sheet-down" : "anim-sheet"} absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col gap-3.5 overflow-y-auto rounded-t-[20px] bg-white text-ink px-5 pt-2.5 pb-7`}
       >
         <div className="h-1 w-10 self-center rounded-full bg-line" />
-        <p className="m-0 text-[17px] font-bold">{title}</p>
-        {children}
+        <p className="m-0 text-[17px] font-bold">{shown.title}</p>
+        {shown.children}
       </section>
     </div>
   );

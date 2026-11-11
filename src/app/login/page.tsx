@@ -144,7 +144,7 @@ function Login() {
         </p>
         <div className="flex flex-col">
           {accounts.map((m) => (
-            <button key={m.email} onClick={() => choose(m.email)} className="flex min-h-12 items-center gap-2 border-t border-hair text-left">
+            <button key={m.email} onClick={() => choose(m.email)} className="flex min-h-12 items-center gap-2 border-t border-divider text-left">
               <span className="grow">
                 <span className="block text-[15px]">{m.name}</span>
                 <span className="block text-[11px] text-muted">{m.email}</span>

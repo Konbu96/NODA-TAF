@@ -27,7 +27,7 @@ function Body({ db }: { db: DbState }) {
   const n = (v: string) => Number(v || 0);
 
   const row = (label: string, value: string, set: (v: string) => void, plus?: boolean, first?: boolean) => (
-    <label className={`flex min-h-[60px] items-center gap-2 ${first ? "" : "border-t border-hair"}`}>
+    <label className={`flex min-h-[60px] items-center gap-2 ${first ? "" : "border-t border-divider"}`}>
       <span className="grow text-[15px]">{label}</span>
       {plus && <span className="text-[15px] text-muted">＋</span>}
       <input inputMode="numeric" value={value} onChange={(e) => set(onlyDigits(e.target.value, 5))} className={yen} />

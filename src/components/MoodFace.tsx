@@ -84,3 +84,15 @@ export function MoodFace({ kind, size = 22 }: { kind: MoodKind; size?: number })
     </svg>
   );
 }
+
+/** 今日まだアプリを開いていない（気分を選んでいない）人の顔。灰色でうすく、目を閉じた形 */
+export function NoMoodFace({ size = 22 }: { size?: number }) {
+  const gray = "#94A3B8";
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="今日はまだ開いていません" className="shrink-0">
+      <circle cx="12" cy="12" r="10" fill="#F1F5F9" stroke={gray} strokeWidth="1.5" strokeDasharray="3 2" />
+      <path d="M7.5 10.5h3M13.5 10.5h3" fill="none" stroke={gray} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9.5 15.2h5" fill="none" stroke={gray} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}

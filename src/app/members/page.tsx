@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { MoodFace } from "@/components/MoodFace";
+import { MoodFace, NoMoodFace } from "@/components/MoodFace";
+import { RoleTag } from "@/components/ui";
 import { MainShell } from "@/components/Shell";
 import { monthLabel } from "@/lib/dates";
 import { athletes, pendingMembers, reflectionStatus } from "@/lib/derived";
@@ -35,16 +36,16 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
     const goal = db.goals[`${month}_${m.email}`]?.goal;
     const mood = db.moods[`${today}_${m.email}`];
     return (
-      <Link key={m.email} href={`/members/detail?id=${encodeURIComponent(m.email)}`} className="block border-b border-hair px-4 py-2.5 hover:bg-[#F8FAFC]">
+      <Link key={m.email} href={`/members/detail?id=${encodeURIComponent(m.email)}`} className="block border-b border-divider px-4 py-2.5 hover:bg-[#F8FAFC]">
         <span className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-[15px] font-medium">
+            {/* 今日の気分は名前の左。まだ開いていない人は灰色の顔 */}
+            {mood ? <MoodFace kind={mood.mood} /> : <NoMoodFace />}
             {m.name}
-            {mood && <MoodFace kind={mood.mood} />}
+            <RoleTag label={ROLE_LABEL[m.role]} />
           </span>
-          <span className="text-xs text-sub">
-            {/* ゼッケンと役職 */}
-            {[hasEvents(m) && m.bibNumber, ROLE_LABEL[m.role]].filter(Boolean).join("・")}
-          </span>
+          {/* ゼッケン（役職は名前の横の札） */}
+          <span className="text-xs text-sub">{hasEvents(m) && m.bibNumber}</span>
         </span>
         {!writesReflection(m) ? null : goal ? (
           <span className="mt-[3px] block text-[13px] text-[#334155]">目標：{goal}</span>
@@ -126,7 +127,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
                 <button
                   onClick={() => setOpen(open === g ? "" : g)}
                   aria-expanded={open === g}
-                  className="w-full border-b border-hair px-4 py-3 text-left text-sm font-bold"
+                  className="w-full border-b border-divider px-4 py-3 text-left text-sm font-bold"
                 >
                   {open === g ? "▼" : "▶"} {g}（{people.length}人）
                 </button>

@@ -58,7 +58,7 @@ export default function PendingPage() {
                 アプリが使えるようになります。
               </p>
             </div>
-            <section className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white">
+            <section className="overflow-hidden rounded-xl border border-divider bg-white">
               <p className="m-0 px-4 pt-3 pb-1 text-xs font-bold text-sub">申請した内容</p>
               <div className="flex justify-between px-4 py-2 text-[15px]">
                 <span className="text-sub">名前</span>

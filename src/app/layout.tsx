@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { EnterToSave } from "@/components/EnterToSave";
+import { PageSlide } from "@/components/PageSlide";
+import { PageTransition } from "@/components/PageTransition";
 
 const noto = Noto_Sans_JP({
   variable: "--font-noto",
@@ -25,8 +27,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ja">
       <body className={`${noto.variable} font-sans antialiased`}>
-        <div className="relative mx-auto min-h-dvh w-full max-w-[480px] bg-page">{children}</div>
+        <div className="relative mx-auto min-h-dvh w-full max-w-[480px] bg-page">
+          <PageSlide>{children}</PageSlide>
+        </div>
         <EnterToSave />
+        <PageTransition />
       </body>
     </html>
   );

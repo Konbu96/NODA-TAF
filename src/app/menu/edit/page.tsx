@@ -104,7 +104,7 @@ function Form({ db, me, date }: { db: DbState; me: Member; date: string }) {
         <div className="flex flex-col">
           {items.map((it, i) =>
             needsDetail(it.type) ? (
-              <button key={i} onClick={() => setEditing(i)} className="flex min-h-12 items-center gap-2 border-t border-hair px-1 text-left">
+              <button key={i} onClick={() => setEditing(i)} className="flex min-h-12 items-center gap-2 border-t border-divider px-1 text-left">
                 <span className="grow text-sm">
                   <b>
                     {i + 1}. {it.type}

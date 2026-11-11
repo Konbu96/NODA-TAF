@@ -8,7 +8,7 @@ import { isAthlete } from "@/lib/permissions";
 import type { DbState, Member } from "@/lib/types";
 import { USE_FIREBASE } from "@/lib/firebase";
 import { useApp } from "@/lib/useApp";
-import { BackIcon, CloseIcon, HomeIcon, ListIcon, PeopleIcon, PersonIcon, TrophyIcon } from "./icons";
+import { BackIcon, HomeCloseIcon, ListIcon, PeopleIcon, PersonIcon, TrophyIcon } from "./icons";
 import { Badge } from "./ui";
 
 /** ログインと承認を確かめ、必要なら別の画面へ送る */
@@ -49,6 +49,16 @@ type Tab = "menu" | "meets" | "members" | "mypage";
 export function MainShell({ title, tab, children }: { title: string; tab: Tab; children: (ctx: { db: DbState; me: Member; today: string }) => ReactNode }) {
   const gate = useGate();
   const [navOpen, setNavOpen] = useState(false);
+  const [navClosing, setNavClosing] = useState(false);
+  // × で閉じるときは、上（外側）のボタンから順にホームボタンへ戻ってから消す
+  const closeNav = () => {
+    if (navClosing) return;
+    setNavClosing(true);
+    setTimeout(() => {
+      setNavOpen(false);
+      setNavClosing(false);
+    }, 200 + 3 * 50);
+  };
   if (!gate) return null;
   const { db, me, today } = gate;
   const b = badges(db, me, today);
@@ -72,13 +82,16 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
       <main className="flex grow flex-col gap-2.5 px-4 pt-3 pb-24">{children({ db, me, today })}</main>
 
       {navOpen && (
-        <button aria-label="行き先を閉じる" onClick={() => setNavOpen(false)} className="anim-fade fixed inset-0 z-30 mx-auto max-w-[480px] bg-ink/35" />
+        <button aria-label="行き先を閉じる" onClick={closeNav} className="anim-fade fixed inset-0 z-30 mx-auto max-w-[480px] bg-ink/35" />
       )}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[480px]">
         {navOpen && (
           <nav aria-label="画面の切り替え" className="pointer-events-auto absolute right-5 bottom-24 flex flex-col items-end gap-2.5">
-            {navItems.map((n) => {
-              const cls = "relative flex h-12 items-center gap-2.5 rounded-3xl pr-[18px] pl-3.5 text-[15px] font-bold shadow-[0_4px_14px_rgba(15,23,42,0.18)]";
+            {navItems.map((n, i) => {
+              // 下のボタンから順に、少しずつ遅らせて下から出てくる
+              // 閉じるときは逆に、上のボタンから順に戻る
+              const pop = { animationDelay: navClosing ? `${i * 50}ms` : `${(navItems.length - 1 - i) * 60}ms` };
+              const cls = `${navClosing ? "nav-back" : "nav-pop"} relative flex h-12 items-center gap-2.5 rounded-3xl pr-[18px] pl-3.5 text-[15px] font-bold shadow-[0_4px_14px_rgba(15,23,42,0.18)]`;
               const body = (
                 <>
                   <span className="text-accent">{n.icon}</span>
@@ -87,11 +100,11 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
                 </>
               );
               return n.tab === tab ? (
-                <button key={n.tab} onClick={() => setNavOpen(false)} className={`${cls} bg-accent-soft text-accent`}>
+                <button key={n.tab} onClick={closeNav} style={pop} className={`${cls} bg-accent-soft text-accent`}>
                   {body}
                 </button>
               ) : (
-                <Link key={n.tab} href={n.href} className={`${cls} bg-white text-ink`}>
+                <Link key={n.tab} href={n.href} style={pop} className={`${cls} bg-white text-ink`}>
                   {body}
                 </Link>
               );
@@ -99,11 +112,11 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
           </nav>
         )}
         <button
-          onClick={() => setNavOpen(!navOpen)}
+          onClick={() => (navOpen ? closeNav() : setNavOpen(true))}
           aria-label={navOpen ? "行き先を閉じる" : "行き先を開く"}
           className="pointer-events-auto absolute right-5 bottom-6 flex h-[60px] w-[60px] items-center justify-center rounded-full bg-accent text-white shadow-[0_6px_18px_rgba(30,58,138,0.4)]"
         >
-          {navOpen ? <CloseIcon size={26} /> : <HomeIcon />}
+          <HomeCloseIcon open={navOpen && !navClosing} />
           {!navOpen && anyBadge && <span className="absolute top-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-warn" />}
         </button>
       </div>

@@ -81,9 +81,9 @@ function Form({ db, me, today, date }: { db: DbState; me: Member; today: string;
             </span>
           ))}
         </div>
-        {people.length === 0 && <p className="m-0 border-t border-hair py-4 text-sm text-muted">この日に「行く」と答えた人がいません。</p>}
+        {people.length === 0 && <p className="m-0 border-t border-divider py-4 text-sm text-muted">この日に「行く」と答えた人がいません。</p>}
         {people.map((p) => (
-          <div key={p.email} className="flex min-h-[52px] items-center gap-2 border-t border-hair">
+          <div key={p.email} className="flex min-h-[52px] items-center gap-2 border-t border-divider">
             <span className="min-w-0 grow truncate text-[15px]">{p.name}</span>
             {Array.from({ length: n }, (_, i) => {
               const key = `${dist}|${p.email}|${i}`;
@@ -101,11 +101,11 @@ function Form({ db, me, today, date }: { db: DbState; me: Member; today: string;
             })}
           </div>
         ))}
-        <div className="flex items-center justify-center gap-0.5 border-t border-hair pt-1.5">
+        <div className="flex items-center justify-center gap-0.5 border-t border-divider pt-1.5">
           <button
             onClick={() => setRuns({ ...runs, [dist]: Math.max(1, n - 1) })}
             aria-label={`${dist} の本数を減らす`}
-            className={`h-8 w-8 rounded-lg border bg-transparent text-[15px] ${n > 1 ? "border-[#94A3B8] text-[#94A3B8]" : "border-[#E2E8F0] text-[#E2E8F0]"}`}
+            className={`h-8 w-8 rounded-lg border bg-transparent text-[15px] ${n > 1 ? "border-[#94A3B8] text-[#94A3B8]" : "border-divider text-[#E2E8F0]"}`}
           >
             −
           </button>
@@ -113,7 +113,7 @@ function Form({ db, me, today, date }: { db: DbState; me: Member; today: string;
           <button
             onClick={() => setRuns({ ...runs, [dist]: Math.min(4, n + 1) })}
             aria-label={`${dist} の本数を増やす`}
-            className={`h-8 w-8 rounded-lg border bg-transparent text-[15px] ${n < 4 ? "border-[#94A3B8] text-[#94A3B8]" : "border-[#E2E8F0] text-[#E2E8F0]"}`}
+            className={`h-8 w-8 rounded-lg border bg-transparent text-[15px] ${n < 4 ? "border-[#94A3B8] text-[#94A3B8]" : "border-divider text-[#E2E8F0]"}`}
           >
             ＋
           </button>

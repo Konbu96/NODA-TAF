@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DownIcon, NextIcon, PlusIcon } from "@/components/icons";
 import { LineChart } from "@/components/LineChart";
-import { MoodFace } from "@/components/MoodFace";
+import { MoodFace, NoMoodFace } from "@/components/MoodFace";
 import { MainShell } from "@/components/Shell";
 import { WarmUpText } from "@/components/WarmUpText";
-import { Card, Chip, Confirm, Label, PrimaryButton, RefMark, Sheet, EditButton } from "@/components/ui";
+import { Card, Chip, Confirm, Label, PrimaryButton, RefMark, Sheet, EditButton, RoleTag } from "@/components/ui";
 import { monthLabel, shortDate } from "@/lib/dates";
 import { reflectionStatus } from "@/lib/derived";
 import { legalBestIfRef, pbEvents } from "@/lib/pb";
@@ -49,15 +49,16 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
   return (
     <>
       <Card className="flex items-center gap-3">
-        {mood ? <MoodFace kind={mood.mood} size={44} /> : <span className="h-11 w-11 rounded-full bg-hair" />}
+        {mood ? <MoodFace kind={mood.mood} size={44} /> : <NoMoodFace size={44} />}
         <div className="grow">
-          <p className="m-0 text-lg font-bold">{me.name}</p>
-          <p className="mt-0.5 mb-0 text-[13px] text-sub">
-            {runner ? [grade, me.bibNumber && `ゼッケン ${me.bibNumber}`].filter(Boolean).join("・") : [grade, ROLE_LABEL[me.role]].filter(Boolean).join("・")}
+          <p className="m-0 flex items-center gap-2 text-lg font-bold">
+            {me.name}
+            <RoleTag label={ROLE_LABEL[me.role]} />
           </p>
+          <p className="mt-0.5 mb-0 text-[13px] text-sub">{[grade, runner && me.bibNumber && `ゼッケン ${me.bibNumber}`].filter(Boolean).join("・")}</p>
         </div>
         {runner && (
-          <EditButton href={`/profile/edit?id=${encodeURIComponent(me.email)}`} ariaLabel="プロフィールを編集" />
+          <EditButton href="/profile/edit" ariaLabel="プロフィールを編集" />
         )}
       </Card>
 
@@ -183,7 +184,7 @@ function WarmUpDetails({ db, today }: { db: DbState; today: string }) {
       <Label className="mb-1">練習メモ</Label>
       {names.length === 0 && <p className="m-0 pb-2.5 text-sm text-muted">練習メモはまだありません。</p>}
       {names.map((w) => (
-        <div key={w} className="border-t border-hair">
+        <div key={w} className="border-t border-divider">
           <button onClick={() => toggle(w)} aria-expanded={open.includes(w)} className="flex min-h-12 w-full items-center gap-2 text-left text-[15px]">
             <span className="grow font-medium">{w}</span>
             {todays.includes(w) && <span className="rounded-[10px] bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent">今日</span>}
@@ -199,7 +200,7 @@ function WarmUpDetails({ db, today }: { db: DbState; today: string }) {
           )}
         </div>
       ))}
-      <button onClick={startAdd} className="flex min-h-12 items-center gap-1.5 border-t border-hair text-[15px] font-bold text-accent">
+      <button onClick={startAdd} className="flex min-h-12 items-center gap-1.5 border-t border-divider text-[15px] font-bold text-accent">
         <PlusIcon />
         追加
       </button>

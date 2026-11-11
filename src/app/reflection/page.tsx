@@ -24,7 +24,7 @@ const area = "w-full resize-none rounded-lg border border-line p-2.5 text-[15px]
 function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
   const r = reflectionStatus(db, me, today);
   const lastGoal = db.goals[`${r.lastMonth}_${me.email}`]?.goal ?? "";
-  // 先月の 25 日より後に入部した人は、先月の目標がないので質問 1・2 を飛ばす
+  // 先月の 25 日より後に入部した人は、先月の目標がアプリにないので、質問 1 は書かなくてもよい
   const newcomer = me.createdAt.slice(0, 10) > `${r.lastMonth}-25`;
   const missedLast = !newcomer && !lastGoal;
   const [q1, setQ1] = useState(lastGoal);
@@ -46,7 +46,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
     );
   }
 
-  const ready = q4.trim() && q3.trim() && (newcomer || (q1.trim() && q2 != null));
+  const ready = q4.trim() && q3.trim() && q2 != null && (newcomer || q1.trim());
   let n = 0;
 
   return (
@@ -62,31 +62,29 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
         </section>
       )}
 
-      {!newcomer && (
-        <>
-          <Card className="flex flex-col gap-2">
-            <label htmlFor="q1" className="text-sm font-bold">
-              {++n}. あなたの先月の個人目標は何でしたか？
-            </label>
-            {missedLast && <p className="m-0 text-xs text-danger">先月の目標が登録されていないため、自分で書いてください</p>}
-            <textarea id="q1" rows={2} value={q1} onChange={(e) => setQ1(e.target.value)} className={area} />
-          </Card>
-          <Card className="flex flex-col gap-2.5">
-            <p className="m-0 text-sm font-bold">{++n}. 目標をどのくらい達成できましたか？</p>
-            <div role="radiogroup" aria-label="達成度" className="grid grid-cols-5 gap-1.5">
-              {[1, 2, 3, 4, 5].map((v) => (
-                <button key={v} role="radio" aria-checked={q2 === v} onClick={() => setQ2(v)} className={`h-11 rounded-lg text-base ${q2 === v ? chipOn : chipOff}`}>
-                  {v}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-between text-[11px] text-sub">
-              <span>達成できなかった</span>
-              <span>完璧に達成できた</span>
-            </div>
-          </Card>
-        </>
-      )}
+      {/* 先月の目標と達成度は、みんなに聞く（アプリを使い始めたばかりの人も） */}
+      <Card className="flex flex-col gap-2">
+        <label htmlFor="q1" className="text-sm font-bold">
+          {++n}. あなたの先月の個人目標は何でしたか？
+        </label>
+        {missedLast && <p className="m-0 text-xs text-danger">先月の目標が登録されていないため、自分で書いてください</p>}
+        {newcomer && !lastGoal && <p className="m-0 text-xs text-muted">アプリに先月の目標がないので、覚えていれば書いてください</p>}
+        <textarea id="q1" rows={2} value={q1} onChange={(e) => setQ1(e.target.value)} className={area} />
+      </Card>
+      <Card className="flex flex-col gap-2.5">
+        <p className="m-0 text-sm font-bold">{++n}. 目標をどのくらい達成できましたか？</p>
+        <div role="radiogroup" aria-label="達成度" className="grid grid-cols-5 gap-1.5">
+          {[1, 2, 3, 4, 5].map((v) => (
+            <button key={v} role="radio" aria-checked={q2 === v} onClick={() => setQ2(v)} className={`h-11 rounded-lg text-base ${q2 === v ? chipOn : chipOff}`}>
+              {v}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-between text-[11px] text-sub">
+          <span>達成できなかった</span>
+          <span>完璧に達成できた</span>
+        </div>
+      </Card>
       <Card className="flex flex-col gap-2">
         <label htmlFor="q3" className="text-sm font-bold">
           {++n}. 達成できた・できなかった部分や、新しい課題
@@ -102,7 +100,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
       <PrimaryButton
         disabled={!ready}
         onClick={async () => {
-          await submitReflection(me.email, r.month, newcomer ? "" : q1.trim(), newcomer ? null : q2, q3.trim(), q4.trim());
+          await submitReflection(me.email, r.month, q1.trim(), q2, q3.trim(), q4.trim());
           setSent(true);
         }}
       >

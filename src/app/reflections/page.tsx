@@ -41,7 +41,7 @@ function Body({ db, me }: { db: DbState; me: Member }) {
               <DownIcon className={`text-[#94A3B8] transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </button>
             {isOpen && (
-              <div className="flex flex-col gap-3 border-t border-hair px-4 pt-3 pb-4">
+              <div className="flex flex-col gap-3 border-t border-divider px-4 pt-3 pb-4">
                 {r.lastGoal && <QA q="先月の目標" a={r.lastGoal} />}
                 {r.achievement != null && <QA q="達成度" a={`${r.achievement} / 5`} />}
                 <QA q="できたこと・できなかったこと・新しい課題" a={r.review} />

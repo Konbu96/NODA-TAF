@@ -92,7 +92,7 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
         </div>
 
         {menu ? (
-          <div className="border-t border-[#E2E8F0]">
+          <div className="border-t border-divider">
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
               <p className="m-0 text-[13px] font-bold text-accent">練習メニュー</p>
               {editor && <EditButton small href={`/menu/edit?date=${date}`} ariaLabel="メニューを編集" />}
@@ -153,7 +153,7 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 border-t border-[#E2E8F0] px-4 py-7 text-center">
+          <div className="flex flex-col items-center gap-3 border-t border-divider px-4 py-7 text-center">
             {/* 過ぎた日は、もう登録しないので案内だけ出す */}
             <p className="m-0 text-sm text-sub">{date < today ? "メニューは登録されていませんでした" : "まだ登録されていません"}</p>
             {editor && date >= today && (
@@ -249,7 +249,7 @@ function StadiumBlock({ db, me, date, today }: { db: DbState; me: Member; date: 
             </p>
             {g.list.length === 0 && <p className="m-0 text-sm text-muted">いません</p>}
             {g.list.map((m) => (
-              <div key={m.email} className="flex min-h-10 items-center gap-2 border-t border-hair text-sm">
+              <div key={m.email} className="flex min-h-10 items-center gap-2 border-t border-divider text-sm">
                 <span className="grow">{m.name}</span>
                 {g.showFee && <span>{fee(m)}円</span>}
                 {editor && (

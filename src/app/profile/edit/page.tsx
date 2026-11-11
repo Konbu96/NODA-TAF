@@ -23,13 +23,15 @@ export default function Page() {
 function Inner() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
+  // 来た画面に戻る（マイページから開いたときは id なし）
+  const back = id ? `/members/detail?id=${encodeURIComponent(id)}` : "/mypage";
   return (
-    <SubShell title="プロフィール" back={id ? `/members/detail?id=${encodeURIComponent(id)}` : "/mypage"}>
+    <SubShell title="プロフィール" back={back}>
       {({ db, me, today }) => {
         const target = db.members[id || me.email];
         if (!target) return <p className="text-sm text-sub">部員が見つかりません。</p>;
         if (!canEditProfileOf(me, target.email)) return <p className="text-sm text-sub">この人のプロフィールは直せません。</p>;
-        return <Form key={target.email} db={db} target={target} me={me} today={today} />;
+        return <Form key={target.email} db={db} target={target} me={me} today={today} back={back} />;
       }}
     </SubShell>
   );
@@ -38,7 +40,7 @@ function Inner() {
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
 const ROLES: Role[] = ["member", "captain", "viceCaptain", "manager", "adviser"];
 
-function Form({ target, me, today }: { db: DbState; target: Member; me: Member; today: string }) {
+function Form({ target, me, today, back }: { db: DbState; target: Member; me: Member; today: string; back: string }) {
   const [role, setRole] = useState<Role>(target.role);
   const [bib, setBib] = useState(target.bibNumber);
   const [restDay, setRestDay] = useState(target.restDay ?? "");
@@ -53,7 +55,6 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
   );
   const [addSheet, setAddSheet] = useState(false);
   const router = useRouter();
-  const self = me.email === target.email;
   // マネージャー・顧問には、ゼッケンの欄を出さない
   const athlete = hasEvents({ ...target, role });
   // 役職を変えられるのは顧問・開発者だけ
@@ -119,7 +120,7 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
           {Object.entries(pbs).map(([ev, d]) => {
             const recordPb = target.personalBests.find((p) => p.event === ev && p.recordId);
             return (
-              <div key={ev} className="flex min-h-14 items-center gap-2.5 border-t border-hair py-1.5">
+              <div key={ev} className="flex min-h-14 items-center gap-2.5 border-t border-divider py-1.5">
                 <b className="w-24 shrink-0 text-[15px]">{ev}</b>
                 <div className="flex min-w-0 grow flex-col gap-0.5">
                   <input
@@ -183,7 +184,7 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
           await saveProfile(target.email, { bibNumber: bib, gender: target.gender ?? "", restDay }, target.events, pbs);
           if (roleEditable && role !== target.role) await updateMember(target.email, { role });
           // 保存したら、来た画面に戻る
-          router.push(self ? "/mypage" : `/members/detail?id=${encodeURIComponent(target.email)}`);
+          router.push(back);
         }}
       >
         保存する

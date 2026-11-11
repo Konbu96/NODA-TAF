@@ -10,6 +10,8 @@
   --color-muted: #64748b;
   --color-line: #cbd5e1;
   --color-hair: #f1f5f9;
+  /* 欄や行を区切る薄い線（アプリ全体でこの色にそろえる） */
+  --color-divider: #d5dce5;
   --color-warn: #ea580c;
   --color-warn-dark: #9a3412;
   --color-warn-soft: #fff7ed;
@@ -81,4 +83,214 @@ textarea::placeholder {
 }
 .anim-fade {
   animation: fade-in 0.2s ease-out;
+}
+/* 下から出る画面を閉じるとき：下にすっと戻る */
+@keyframes sheet-down {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.anim-sheet-down {
+  animation: sheet-down 0.22s ease-in both;
+}
+.anim-fade-out {
+  animation: fade-out 0.22s ease-in both;
+}
+
+/* 画面の切りかえ：真ん中から丸が広がる（pop-in）→ 覆ったまま（pop-hold）→ 真ん中へしぼむ（pop-out）。
+   時間は PageTransition.tsx の POP と合わせる */
+@keyframes pop-in {
+  from {
+    transform: translate(-50%, -50%) scale(0);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+.pop-in {
+  animation: pop-in 0.6s cubic-bezier(0.45, 0, 0.35, 1) both;
+}
+.pop-hold {
+  transform: translate(-50%, -50%);
+}
+.pop-out {
+  animation: pop-in 0.6s cubic-bezier(0.65, 0, 0.55, 1) reverse both;
+}
+
+/* 棒人間の手足（交互にふる） */
+@keyframes run-swing-a {
+  0%,
+  100% {
+    transform: rotate(-50deg);
+  }
+  50% {
+    transform: rotate(50deg);
+  }
+}
+@keyframes run-swing-b {
+  0%,
+  100% {
+    transform: rotate(50deg);
+  }
+  50% {
+    transform: rotate(-50deg);
+  }
+}
+@keyframes run-bob {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+  25%,
+  75% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes run-ground {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-20px);
+  }
+}
+.run-leg-a {
+  animation: run-swing-a 0.5s ease-in-out infinite;
+}
+.run-leg-b {
+  animation: run-swing-b 0.5s ease-in-out infinite;
+}
+/* うで：前は顔の前まで上げ、うしろも同じくらい大きく引く */
+@keyframes run-arm-a {
+  0%,
+  100% {
+    transform: rotate(110deg);
+  }
+  50% {
+    transform: rotate(-115deg);
+  }
+}
+@keyframes run-arm-b {
+  0%,
+  100% {
+    transform: rotate(-115deg);
+  }
+  50% {
+    transform: rotate(110deg);
+  }
+}
+.run-arm-a {
+  animation: run-arm-a 0.5s ease-in-out infinite;
+}
+.run-arm-b {
+  animation: run-arm-b 0.5s ease-in-out infinite;
+}
+/* ひざの曲げ：足が真下に来て地面につくとき（25%）はすねをまっすぐ（地面と直角）、
+   うしろでけったあとは少し曲げ、前に戻るとき（75%〜）は深く曲げる */
+@keyframes run-knee-a {
+  0%,
+  100% {
+    transform: rotate(75deg);
+  }
+  25% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(20deg);
+  }
+  75% {
+    transform: rotate(95deg);
+  }
+}
+@keyframes run-knee-b {
+  0%,
+  100% {
+    transform: rotate(20deg);
+  }
+  25% {
+    transform: rotate(95deg);
+  }
+  50% {
+    transform: rotate(75deg);
+  }
+  75% {
+    transform: rotate(0deg);
+  }
+}
+.run-knee-a {
+  animation: run-knee-a 0.5s ease-in-out infinite;
+}
+.run-knee-b {
+  animation: run-knee-b 0.5s ease-in-out infinite;
+}
+.run-bob {
+  animation: run-bob 0.5s ease-in-out infinite;
+}
+.run-ground {
+  animation: run-ground 0.25s linear infinite;
+}
+
+/* ホームボタンを押したとき：行き先のボタンが下から順に出てくる */
+@keyframes nav-pop {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.nav-pop {
+  animation: nav-pop 0.25s cubic-bezier(0.3, 0.7, 0.4, 1.2) both;
+}
+/* × を押したとき：上のボタンから順に、下（ホームボタン）へ戻って消える */
+@keyframes nav-back {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(18px) scale(0.9);
+  }
+}
+.nav-back {
+  animation: nav-back 0.2s ease-in both;
+}
+
+/* メイン以外の画面の移動：横からスライドして入る（うすくはしない。終わったら transform を残さない） */
+@keyframes slide-from-right {
+  from {
+    transform: translateX(40%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes slide-from-left {
+  from {
+    transform: translateX(-40%);
+  }
+  to {
+    transform: none;
+  }
+}
+.slide-from-right {
+  animation: slide-from-right 0.32s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.slide-from-left {
+  animation: slide-from-left 0.32s cubic-bezier(0.2, 0.7, 0.3, 1);
 }

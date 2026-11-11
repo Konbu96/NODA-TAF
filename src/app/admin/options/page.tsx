@@ -117,7 +117,7 @@ function Body({ db }: { db: DbState }) {
                       setEditing(w);
                       setDetail(db.warmUpDetails[w] ?? "");
                     }}
-                    className="flex min-h-11 items-center gap-2 border-t border-hair text-left text-[14px]"
+                    className="flex min-h-11 items-center gap-2 border-t border-divider text-left text-[14px]"
                   >
                     <span className="grow">{w}</span>
                     <span className={`text-xs ${lines ? "text-sub" : "text-muted"}`}>{lines ? `中身 ${lines}行` : "中身なし"}</span>

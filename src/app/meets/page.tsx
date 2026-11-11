@@ -38,7 +38,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
         {upcoming.map((m) => {
           const mine = db.entries[m.id]?.[me.email];
           return (
-            <Link key={m.id} href={`/meets/detail?id=${m.id}`} className={`flex items-center gap-3 border-b border-hair px-4 py-3 hover:bg-[#F8FAFC] ${editor ? "" : "last:border-b-0"}`}>
+            <Link key={m.id} href={`/meets/detail?id=${m.id}`} className={`flex items-center gap-3 border-b border-divider px-4 py-3 hover:bg-[#F8FAFC] ${editor ? "" : "last:border-b-0"}`}>
               <div className="w-12 shrink-0 text-center">
                 <p className="m-0 text-[11px] text-sub">{monthOf(m.startDate)}月</p>
                 <p className="m-0 text-[22px] leading-[1.1] font-bold text-accent">{dayOf(m.startDate)}</p>
@@ -61,7 +61,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
         })}
         {/* 大会の登録（担当者）。大会の一覧と薄い線で区切って、その下に置く */}
         {editor && (
-          <div className={`flex justify-center py-3 ${upcoming.length === 0 ? "border-t border-hair" : ""}`}>
+          <div className={`flex justify-center py-3 ${upcoming.length === 0 ? "border-t border-divider" : ""}`}>
             <Link href="/meets/edit" className="flex items-center gap-1.5 rounded-full bg-accent-soft px-5 py-2.5 text-sm font-bold text-accent">
               <PlusIcon />
               大会を登録する
@@ -89,12 +89,12 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
 
       {past.length > 0 && (
         // 「大会を登録する」と少し間を空ける
-        <section className="mt-4 overflow-hidden rounded-xl border border-[#D5DCE5] bg-[#E6EBF1]">
+        <section className="mt-4 overflow-hidden rounded-xl border border-divider bg-[#E6EBF1]">
           <p className="m-0 px-4 pt-2.5 pb-1 text-xs font-bold text-muted">終わった大会</p>
           {past.map((m) => {
             const miss = isAthlete(me) && missingRecords(db, m, me.email, today).length > 0;
             return (
-              <Link key={m.id} href={`/meets/detail?id=${m.id}`} className="flex items-center gap-3 border-t border-[#D5DCE5] px-4 py-2 text-sub">
+              <Link key={m.id} href={`/meets/detail?id=${m.id}`} className="flex items-center gap-3 border-t border-divider px-4 py-2 text-sub">
                 <span className="w-12 shrink-0 text-center text-[13px]">{shortDate(m.startDate)}</span>
                 <span className="grow text-sm">{m.name}</span>
                 {miss ? <span className="text-xs text-warn-dark">入力待ち</span> : <span className="text-xs text-muted">結果 {resultCount(m.id)}人</span>}

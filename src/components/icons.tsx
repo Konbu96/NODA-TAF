@@ -68,3 +68,23 @@ export const EyeIcon = ({ size = 20, className }: P) => (
 export const EyeOffIcon = ({ size = 20, className }: P) => (
   <svg {...base(size)} className={className}><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1" /><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
 );
+
+/**
+ * ホームボタンの絵。open のとき × 、閉じているとき家。
+ * × の 2 本の棒が、回りながら動いて家の屋根になり、壁とドアがふわっと出る（その逆も）。
+ */
+export const HomeCloseIcon = ({ open, size = 26 }: { open: boolean; size?: number }) => {
+  const move = { transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)", transformOrigin: "0 0" };
+  // 長さ 12.5 の棒を、真ん中の位置と角度で置く
+  const bar = (x: number, y: number, deg: number) => ({ ...move, transform: `translate(${x}px, ${y}px) rotate(${deg}deg)` });
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="-6.25" y1="0" x2="6.25" y2="0" style={open ? bar(12, 12, 45) : bar(16.5, 7.25, 39.8)} />
+      <line x1="-6.25" y1="0" x2="6.25" y2="0" style={open ? bar(12, 12, -45) : bar(7.5, 7.25, -39.8)} />
+      <g style={{ transition: "opacity 0.25s, transform 0.3s", transformOrigin: "12px 20px", opacity: open ? 0 : 1, transform: open ? "scale(0.4)" : "none" }}>
+        <path d="M5.5 9v11h13V9" />
+        <path d="M10 20v-6h4v6" />
+      </g>
+    </svg>
+  );
+};

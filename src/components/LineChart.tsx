@@ -35,9 +35,9 @@ export function LineChart({
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={ariaLabel}>
-        <line x1={left} y1={top} x2={W} y2={top} stroke="#F1F5F9" />
-        <line x1={left} y1={(top + bottom) / 2} x2={W} y2={(top + bottom) / 2} stroke="#F1F5F9" />
-        <line x1={left} y1={bottom} x2={W} y2={bottom} stroke="#E2E8F0" />
+        <line x1={left} y1={top} x2={W} y2={top} stroke="#D5DCE5" />
+        <line x1={left} y1={(top + bottom) / 2} x2={W} y2={(top + bottom) / 2} stroke="#D5DCE5" />
+        <line x1={left} y1={bottom} x2={W} y2={bottom} stroke="#D5DCE5" />
         <text x="0" y={top + 4} fontSize="10" fill="#64748B">{format(topVal)}</text>
         <text x="0" y={(top + bottom) / 2 + 4} fontSize="10" fill="#64748B">{format((min + max) / 2)}</text>
         <text x="0" y={bottom + 4} fontSize="10" fill="#64748B">{format(botVal)}</text>
