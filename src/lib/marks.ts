@@ -6,12 +6,17 @@ export const EVENT_GROUPS: { name: string; kind: EventKind; events: string[] }[]
   { name: "短距離", kind: "time", events: ["100m", "200m", "400m"] },
   { name: "ハードル", kind: "time", events: ["100mH", "110mH", "400mH"] },
   { name: "中長距離", kind: "time", events: ["800m", "1500m", "3000m", "5000m", "3000mSC"] },
+  { name: "リレー", kind: "time", events: ["4継", "マイル"] },
   { name: "跳躍", kind: "distance", events: ["走高跳", "棒高跳", "走幅跳", "三段跳"] },
   { name: "投てき", kind: "distance", events: ["砲丸投", "円盤投", "ハンマー投", "やり投"] },
   { name: "混成", kind: "points", events: ["四種競技", "七種競技", "八種競技"] },
 ];
 
 export const ALL_EVENTS = EVENT_GROUPS.flatMap((g) => g.events);
+
+/** 前の種目名 → 今の種目名（保存済みのデータは読み込むときに読みかえる） */
+const OLD_EVENT_NAMES: Record<string, string> = { "4×100mリレー": "4継", "4×400mリレー": "マイル" };
+export const renameEvent = (e: string) => OLD_EVENT_NAMES[e] ?? e;
 
 /** 風速を入れる種目 */
 export const WIND_EVENTS = ["100m", "200m", "100mH", "110mH", "走幅跳", "三段跳"];
@@ -29,8 +34,12 @@ export function isBetter(event: string, a: number, b: number): boolean {
   return lowerIsBetter(event) ? a < b : a > b;
 }
 
+/** 数字だけ残す。全角の数字（０〜９）は半角に直してから使う */
 export function onlyDigits(v: string, max = 6): string {
-  return v.replace(/[^0-9]/g, "").slice(0, max);
+  return v
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[^0-9]/g, "")
+    .slice(0, max);
 }
 
 /** 打っている途中の表示（1148 → 11.48、43520 → 4:35.20、521 → 5.21） */
@@ -62,6 +71,11 @@ export function parseMark(event: string, d: string): { mark: string; value: numb
   const min = Math.floor(rest / 100);
   if (sec >= 60) return null;
   return { mark: `${pad2(min)}:${pad2(sec)}.${pad2(cs)}`, value: min * 60 + sec + cs / 100 };
+}
+
+/** 表示用：1 分未満のタイムは「00:」を付けない（00:12.05 → 12.05）。保存する形は変えない */
+export function showMark(mark: string): string {
+  return mark.replace(/^00:/, "");
 }
 
 /** 保存した形から、入力欄の数字に戻す */

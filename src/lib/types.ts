@@ -77,6 +77,8 @@ export type RecordDoc = {
   wind: number | null;
   isWindAssisted: boolean;
   isPB: boolean;
+  /** ショート（決められた距離に届かず、計測されなかった）。フィールド種目だけ */
+  isShort?: boolean;
   updatedBy: string;
   updatedAt: string;
 };

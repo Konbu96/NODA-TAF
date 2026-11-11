@@ -1,9 +1,9 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { SubShell } from "@/components/Shell";
-import { chipOff, chipOn, PrimaryButton, Toast } from "@/components/ui";
+import { chipOff, chipOn, PrimaryButton } from "@/components/ui";
 import { dayLabel } from "@/lib/dates";
 import { approvedMembers } from "@/lib/derived";
 import { isPayer, sortMembers } from "@/lib/grade";
@@ -47,7 +47,7 @@ function Form({ db, me, today, date }: { db: DbState; me: Member; today: string;
     for (const s of sessions) for (const d of DISTS) (s.runs[d] ?? []).forEach((t, i) => (v[`${d}|${s.memberId}|${i}`] = secondsToDigits(t)));
     return v;
   });
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
   const n = runs[dist];
 
   const save = async () => {
@@ -58,7 +58,7 @@ function Form({ db, me, today, date }: { db: DbState; me: Member; today: string;
       for (const d of DISTS) input[email][d] = Array.from({ length: runs[d] }, (_, i) => secondsValue(vals[`${d}|${email}|${i}`] ?? ""));
     }
     await saveStabro(date, input, me.email);
-    setSaved(true);
+    router.push("/");
   };
 
   return (
@@ -121,7 +121,6 @@ function Form({ db, me, today, date }: { db: DbState; me: Member; today: string;
       </section>
 
       <PrimaryButton onClick={save}>保存する</PrimaryButton>
-      {saved && <Toast text="記録を保存しました" link={{ href: "/", label: "メニューへ" }} onDone={() => setSaved(false)} />}
     </>
   );
 }

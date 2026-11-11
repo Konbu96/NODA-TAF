@@ -8,7 +8,7 @@ const isAdviser = (m: Member) => m.role === "adviser" || m.isAdmin;
 export const canEditMenu = (m: Member) =>
   isAdviser(m) || ["captain", "viceCaptain", "manager"].includes(m.role);
 
-/** 部員名簿：部員の登録・入部の承認・部員の削除 */
+/** 部員の登録・入部の承認・部員の削除（部員画面から） */
 export const canApprove = (m: Member) => isAdviser(m) || ["captain", "manager"].includes(m.role);
 
 /** 名簿から外せる相手（自分は外せない。顧問・開発者を外せるのは顧問・開発者だけ） */
@@ -25,7 +25,9 @@ export const canEditFees = (m: Member) => isAdviser(m);
 export const canEditProfileOf = (me: Member, targetEmail: string) =>
   me.email === targetEmail || isAdviser(me) || ["captain", "manager"].includes(me.role);
 
-export const canEditRecordsOf = canEditProfileOf;
+/** 大会記録：本人と、マネージャー（ほかの人の分も）。
+ *  TODO(一時的): 前のアプリの記録を移すあいだは、顧問・開発者もほかの人の分を直せる */
+export const canEditRecordsOf = (me: Member, targetEmail: string) => me.email === targetEmail || me.role === "manager" || isAdviser(me);
 
 export const hasAdminMenu = (m: Member) => canEditMenu(m) || canEditFees(m);
 

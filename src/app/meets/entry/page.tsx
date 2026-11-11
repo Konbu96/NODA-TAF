@@ -10,6 +10,7 @@ import { canEditMenu } from "@/lib/permissions";
 import { saveEntry } from "@/lib/store";
 import type { DbState, Meet, Member } from "@/lib/types";
 import { familyName } from "@/lib/names";
+import { pbEvents } from "@/lib/pb";
 
 export default function Page() {
   return (
@@ -41,7 +42,9 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
   const router = useRouter();
   const [events, setEvents] = useState<string[]>(db.entries[meet.id]?.[target.email]?.events ?? []);
   const toggle = (e: string) => setEvents(events.includes(e) ? events.filter((x) => x !== e) : [...events, e]);
-  const others = EVENT_GROUPS.map((g) => ({ ...g, events: g.events.filter((e) => !target.events.includes(e)) })).filter((g) => g.events.length);
+  // 出たことのある種目を上にまとめて出す
+  const done = pbEvents(target);
+  const others = EVENT_GROUPS.map((g) => ({ ...g, events: g.events.filter((e) => !done.includes(e)) })).filter((g) => g.events.length);
 
   return (
     <>
@@ -50,11 +53,11 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
         <p className="m-0 text-[13px] text-sub">{rangeLabel(meet.startDate, meet.endDate)}</p>
       </Card>
       {target.email !== me.email && <p className="m-0 px-1 text-sm font-bold">{familyName(target.name)}のエントリー</p>}
-      {target.events.length > 0 && (
+      {done.length > 0 && (
         <Card className="flex flex-col gap-2">
-          <Label>専門種目</Label>
+          <Label>出たことのある種目</Label>
           <div className="flex flex-wrap gap-1.5">
-            {target.events.map((e) => (
+            {done.map((e) => (
               <Chip key={e} on={events.includes(e)} onClick={() => toggle(e)} className="h-11 px-4 text-[15px]">
                 {e}
               </Chip>
@@ -63,7 +66,7 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
         </Card>
       )}
       <Card className="flex flex-col gap-3">
-        <Label>ほかの種目</Label>
+        <Label>{done.length ? "ほかの種目" : "種目"}</Label>
         {others.map((g) => (
           <div key={g.name}>
             <p className="mt-0 mb-1.5 text-xs font-bold text-muted">{g.name}</p>

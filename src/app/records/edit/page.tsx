@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { BigTrophyIcon, CheckIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
-import { Card, chipOff, chipOn, PrimaryButton, RefMark, Toast } from "@/components/ui";
+import { Card, chipOff, chipOn, PrimaryButton, RefMark } from "@/components/ui";
 import { dayLabel, diffDays } from "@/lib/dates";
-import { kindOf, liveMark, liveWind, markToDigits, onlyDigits, parseMark, WIND_EVENTS, windValue } from "@/lib/marks";
+import { kindOf, liveMark, liveWind, markToDigits, onlyDigits, parseMark, WIND_EVENTS, windValue, showMark } from "@/lib/marks";
 import { canEditRecordsOf } from "@/lib/permissions";
 import { saveRecords, type PbUpdate, type RecordInput } from "@/lib/store";
 import type { DbState, Meet, Member } from "@/lib/types";
@@ -50,14 +50,15 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
       const r = existing.find((x) => x.event === event);
       return {
         event,
-        digits: r ? markToDigits(r.mark) : "",
+        digits: r && !r.isShort ? markToDigits(r.mark) : "",
+        short: !!r?.isShort,
         windDigits: r?.wind != null ? String(Math.round(Math.abs(r.wind) * 10)) : "",
         minus: r?.wind != null && r.wind < 0,
       };
     }),
   );
   const [pbs, setPbs] = useState<PbUpdate[] | null>(null);
-  const [toast, setToast] = useState(false);
+  const router = useRouter();
 
   if (events.length === 0) {
     return (
@@ -73,7 +74,8 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
   const set = (i: number, p: Partial<RecordInput>) => setInputs(inputs.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const cur = inputs[tab];
   const parsed = parseMark(cur.event, cur.digits);
-  const hasWind = WIND_EVENTS.includes(cur.event);
+  const hasWind = WIND_EVENTS.includes(cur.event) && !cur.short;
+  const field = kindOf(cur.event) === "distance";
   const w = windValue(cur.windDigits, cur.minus);
   const isRef = w != null && w > 2.0;
 
@@ -95,7 +97,7 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
             className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] text-[15px] ${tab === i ? chipOn : chipOff}`}
           >
             {x.event}
-            {parseMark(x.event, x.digits) && <CheckIcon />}
+            {(x.short || parseMark(x.event, x.digits)) && <CheckIcon />}
           </button>
         ))}
       </div>
@@ -107,15 +109,30 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
             <span className="flex items-center gap-2">
               <input
                 inputMode="numeric"
-                placeholder="数字のみ入力"
-                value={liveMark(cur.event, cur.digits)}
+                placeholder={cur.short ? "ショート" : "数字のみ入力"}
+                disabled={cur.short}
+                value={cur.short ? "" : liveMark(cur.event, cur.digits)}
                 onChange={(e) => set(tab, { digits: onlyDigits(e.target.value) })}
                 className="h-12 w-[150px] rounded-lg border border-line bg-white px-3 text-left text-xl font-bold tracking-[0.04em] placeholder:text-sm placeholder:font-normal placeholder:tracking-normal"
               />
-              <span className="text-base font-bold">{kindOf(cur.event) === "distance" ? "m" : kindOf(cur.event) === "points" ? "点" : ""}</span>
+              <span className="text-base font-bold">{field ? "m" : kindOf(cur.event) === "points" ? "点" : ""}</span>
+              {/* フィールド種目：決められた距離に届かず計測されなかったとき */}
+              {field && (
+                <button
+                  onClick={() => set(tab, { short: !cur.short, digits: "" })}
+                  aria-pressed={!!cur.short}
+                  className={`ml-auto h-12 rounded-lg px-4 text-sm font-bold ${cur.short ? chipOn : chipOff}`}
+                >
+                  ショート
+                </button>
+              )}
             </span>
           </label>
-          {parsed && <p className="m-0 text-[11px] text-[#94A3B8]">{parsed.mark} として保存します</p>}
+          {cur.short ? (
+            <p className="m-0 text-[11px] text-[#94A3B8]">ショート（記録なし）として保存します。PB には入りません</p>
+          ) : (
+            parsed && <p className="m-0 text-[11px] text-[#94A3B8]">{showMark(parsed.mark)} として保存します</p>
+          )}
         </div>
 
         {hasWind && (
@@ -160,13 +177,12 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
         onClick={async () => {
           const res = await saveRecords(meet, target.email, inputs, me.email);
           if (res.length) setPbs(res);
-          else setToast(true);
+          // PB が出なければ、そのまま大会の画面に戻る
+          else router.push(`/meets/detail?id=${meet.id}`);
         }}
       >
         保存する
       </PrimaryButton>
-
-      {toast && <Toast text="記録を保存しました" link={{ href: `/meets/detail?id=${meet.id}`, label: "大会へ" }} onDone={() => setToast(false)} />}
 
       {pbs && (
         <div className="fixed inset-0 z-50 mx-auto max-w-[480px]">
@@ -178,7 +194,7 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
               <div key={p.event}>
                 <p className="m-0 text-base font-bold">
                   {p.event}　{p.isWindAssisted && <RefMark small />}
-                  {p.mark}
+                  {showMark(p.mark)}
                 </p>
                 {p.diff != null && (
                   <p className="m-0 text-sm text-sub">

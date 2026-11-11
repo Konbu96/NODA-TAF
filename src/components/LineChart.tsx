@@ -7,7 +7,7 @@ export function LineChart({
 }: { points: ChartPoint[]; lowerIsBetter: boolean; ariaLabel: string; format: (v: number) => string }) {
   if (points.length === 0) return <p className="m-0 py-6 text-center text-sm text-muted">まだ記録がありません</p>;
   const W = 326;
-  const H = 150;
+  const H = 152;
   const left = 40;
   const top = 14;
   const bottom = 130;
@@ -25,11 +25,12 @@ export function LineChart({
     const t = (v - min) / (max - min);
     return lowerIsBetter ? top + t * (bottom - top) : bottom - t * (bottom - top);
   };
-  const x = (i: number) => (points.length === 1 ? (left + W) / 2 : left + 10 + (i * (W - left - 20)) / (points.length - 1));
+  const x = (i: number) => (points.length === 1 ? (left + W) / 2 : left + 18 + (i * (W - left - 36)) / (points.length - 1));
   const bestVal = lowerIsBetter ? Math.min(...vals) : Math.max(...vals);
   const bestIdx = vals.lastIndexOf(bestVal);
   const topVal = lowerIsBetter ? min : max;
   const botVal = lowerIsBetter ? max : min;
+  const step = Math.max(1, Math.ceil(points.length / 5));
 
   return (
     <div>
@@ -60,11 +61,22 @@ export function LineChart({
             )}
           </g>
         ))}
+        {/* 日付は点の真下に出す。多いときは重ならないように間引く（最後は必ず出す） */}
+        {points.map((p, i) =>
+          i === points.length - 1 || (i % step === 0 && points.length - 1 - i >= step) ? (
+            <text
+              key={`d${i}`}
+              x={x(i)}
+              y={bottom + 16}
+              fontSize="10"
+              fill="#64748B"
+              textAnchor="middle"
+            >
+              {p.label}
+            </text>
+          ) : null,
+        )}
       </svg>
-      <div className="flex justify-between pl-10 text-[11px] text-muted">
-        <span>{points[0].label}</span>
-        {points.length > 1 && <span>{points[points.length - 1].label}</span>}
-      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { PencilIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
-import { Card, Chip, Confirm, Label, PrimaryButton, Sheet, Stepper, Toast } from "@/components/ui";
+import { Card, Chip, Confirm, Label, PrimaryButton, Sheet, Stepper, EditButton } from "@/components/ui";
 import { dayLabel, diffDays } from "@/lib/dates";
 import { itemSummary, needsDetail } from "@/lib/menuText";
 import { canEditMenu } from "@/lib/permissions";
@@ -39,7 +39,6 @@ function Form({ db, me, date }: { db: DbState; me: Member; date: string }) {
   const [note, setNote] = useState(existing?.note ?? "");
   const [editing, setEditing] = useState(-1);
   const [askDelete, setAskDelete] = useState(false);
-  const [toast, setToast] = useState("");
   const o = db.options;
 
   const toggleType = (type: string) => {
@@ -56,12 +55,16 @@ function Form({ db, me, date }: { db: DbState; me: Member; date: string }) {
 
   const save = async () => {
     await saveMenu({ date, place, warmUp: warm, items, note }, me.email);
-    setToast("メニューを保存しました");
+    router.push("/");
   };
 
   return (
     <>
-      <p className="m-0 text-base font-bold">{dayLabel(date)}</p>
+      <div className="flex items-center gap-2">
+        <p className="m-0 grow text-base font-bold">{dayLabel(date)}</p>
+        {/* 場所・アップ・練習の種類・距離を増やす・消す */}
+        <EditButton href={`/admin/options?date=${date}`} label="種類を編集" />
+      </div>
 
       <Card className="flex flex-col gap-2">
         <Label>場所</Label>
@@ -187,7 +190,6 @@ function Form({ db, me, date }: { db: DbState; me: Member; date: string }) {
         )}
       </Sheet>
 
-      {toast && <Toast text={toast} link={{ href: "/", label: "メニューへ" }} onDone={() => setToast("")} />}
     </>
   );
 }

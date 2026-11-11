@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
+import { PencilIcon } from "./icons";
 
 // 画面で何度も使う小さな部品
 
@@ -39,9 +40,32 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      data-primary
       className="h-[52px] w-full rounded-xl bg-accent text-base font-bold text-white disabled:opacity-40"
     >
       {children}
+    </button>
+  );
+}
+
+/** 編集ボタン（大会・部員・マイページなどで同じ形）。href ならリンク、onClick ならボタン */
+export function EditButton({
+  href, onClick, label = "編集", ariaLabel, small,
+}: { href?: string; onClick?: () => void; label?: string; ariaLabel?: string; small?: boolean }) {
+  const cls = `flex shrink-0 items-center gap-1 rounded-full bg-accent-soft font-bold text-accent ${small ? "h-8 px-2.5 text-xs" : "h-11 px-3 text-[13px]"}`;
+  const inner = (
+    <>
+      <PencilIcon size={small ? 13 : 16} />
+      {label}
+    </>
+  );
+  return href ? (
+    <Link href={href} aria-label={ariaLabel} className={cls}>
+      {inner}
+    </Link>
+  ) : (
+    <button onClick={onClick} aria-label={ariaLabel} className={cls}>
+      {inner}
     </button>
   );
 }

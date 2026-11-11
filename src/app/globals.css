@@ -35,6 +35,12 @@ textarea {
   font-family: inherit;
 }
 
+/* 入力中の欄は薄い水色にする */
+input:focus,
+textarea:focus {
+  background-color: #eff6ff;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: #cbd5e1;

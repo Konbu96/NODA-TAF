@@ -1,9 +1,9 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { SubShell } from "@/components/Shell";
-import { Card, chipOff, chipOn, Label, PrimaryButton, Toast } from "@/components/ui";
+import { Card, chipOff, chipOn, Label, PrimaryButton } from "@/components/ui";
 import { gradeOf, GRADES, graduationYearFor, ROLE_LABEL, type Grade } from "@/lib/grade";
 import { canApprove, canChangeRole } from "@/lib/permissions";
 import { approveMember, updateMember } from "@/lib/store";
@@ -21,14 +21,14 @@ function Inner() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
   // 部員のページから来たときは、そこへ戻る
-  const back = params.get("from") === "detail" ? `/members/detail?id=${encodeURIComponent(id)}` : "/admin/members";
+  const back = params.get("from") === "detail" ? `/members/detail?id=${encodeURIComponent(id)}` : "/members";
   return (
     <SubShell title="部員の編集" back={back}>
       {(ctx) => {
         if (!canApprove(ctx.me)) return <p className="text-sm text-sub">ここを使えるのは顧問・キャプテン・マネージャーだけです。</p>;
         const target = ctx.db.members[id];
         if (!target) return <p className="text-sm text-sub">部員が見つかりません。</p>;
-        return <Form key={id} {...ctx} target={target} />;
+        return <Form key={id} {...ctx} target={target} back={back} />;
       }}
     </SubShell>
   );
@@ -36,11 +36,11 @@ function Inner() {
 
 const ROLES: Role[] = ["member", "captain", "viceCaptain", "manager", "adviser"];
 
-function Form({ me, today, target }: { db: DbState; me: Member; today: string; target: Member }) {
+function Form({ me, today, target, back }: { db: DbState; me: Member; today: string; target: Member; back: string }) {
+  const router = useRouter();
   const [name, setName] = useState(target.name);
   const [grade, setGrade] = useState<Grade | null>(gradeOf(target.graduationYear, today));
   const [role, setRole] = useState<Role>(target.role);
-  const [toast, setToast] = useState("");
   const pending = target.status === "pending";
   const roleEditable = canChangeRole(me);
   const nameEditable = roleEditable || pending;
@@ -49,7 +49,7 @@ function Form({ me, today, target }: { db: DbState; me: Member; today: string; t
     const graduationYear = role === "adviser" || !grade ? null : graduationYearFor(grade, today);
     if (pending) await approveMember(target.email, name.trim(), role === "adviser" ? null : grade, role);
     else if (roleEditable) await updateMember(target.email, { name: name.trim(), role, graduationYear });
-    setToast(pending ? "承認しました" : "保存しました");
+    router.push(back);
   };
 
   return (
@@ -99,7 +99,7 @@ function Form({ me, today, target }: { db: DbState; me: Member; today: string; t
           <button
             onClick={async () => {
               await updateMember(target.email, { status: "rejected" });
-              setToast("申請を通しませんでした");
+              router.push(back);
             }}
             className="h-[52px] rounded-xl border border-line bg-white text-[15px] text-danger"
           >
@@ -117,7 +117,6 @@ function Form({ me, today, target }: { db: DbState; me: Member; today: string; t
         </>
       )}
 
-      {toast && <Toast text={toast} link={{ href: "/admin/members", label: "名簿へ" }} />}
     </>
   );
 }

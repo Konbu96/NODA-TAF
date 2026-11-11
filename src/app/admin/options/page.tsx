@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { CloseIcon, NextIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
 import { Label, PrimaryButton, Sheet } from "@/components/ui";
@@ -20,8 +21,18 @@ const GROUPS: { key: keyof PracticeOptions; name: string }[] = [
 
 export default function OptionsPage() {
   return (
-    <SubShell title="選択肢" back="/">
-      {(ctx) => (canEditMenu(ctx.me) ? <Body db={ctx.db} /> : <p className="text-sm text-sub">選択肢を直せるのは担当者だけです。</p>)}
+    <Suspense>
+      <Inner />
+    </Suspense>
+  );
+}
+
+function Inner() {
+  // メニューの編集から来たときは、その日のメニューの編集に戻る
+  const date = useSearchParams().get("date");
+  return (
+    <SubShell title="メニューの種類" back={date ? `/menu/edit?date=${date}` : "/"}>
+      {(ctx) => (canEditMenu(ctx.me) ? <Body db={ctx.db} /> : <p className="text-sm text-sub">メニューの種類を直せるのは担当者だけです。</p>)}
     </SubShell>
   );
 }

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { badges } from "@/lib/derived";
-import { canEditFees, canEditMenu, hasAdminMenu, isAthlete } from "@/lib/permissions";
+import { isAthlete } from "@/lib/permissions";
 import type { DbState, Member } from "@/lib/types";
 import { USE_FIREBASE } from "@/lib/firebase";
 import { useApp } from "@/lib/useApp";
-import { BackIcon, CloseIcon, HomeIcon, ListIcon, MenuIcon, PeopleIcon, PersonIcon, TrophyIcon } from "./icons";
+import { BackIcon, CloseIcon, HomeIcon, ListIcon, PeopleIcon, PersonIcon, TrophyIcon } from "./icons";
 import { Badge } from "./ui";
 
 /** ログインと承認を確かめ、必要なら別の画面へ送る */
@@ -48,12 +48,10 @@ type Tab = "menu" | "meets" | "members" | "mypage";
 /** 丸ボタンのある画面（メニュー・大会・部員・マイページ） */
 export function MainShell({ title, tab, children }: { title: string; tab: Tab; children: (ctx: { db: DbState; me: Member; today: string }) => ReactNode }) {
   const gate = useGate();
-  const [adminOpen, setAdminOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   if (!gate) return null;
   const { db, me, today } = gate;
   const b = badges(db, me, today);
-  const showAdmin = hasAdminMenu(me);
 
   const navItems: { tab: Tab; href: string; label: string; icon: ReactNode; badge: number }[] = [
     { tab: "mypage", href: "/mypage", label: "マイページ", icon: <PersonIcon />, badge: b.reflection },
@@ -68,37 +66,7 @@ export function MainShell({ title, tab, children }: { title: string; tab: Tab; c
       <header className="sticky top-0 z-30 grid h-14 shrink-0 grid-cols-[96px_1fr_96px] items-center bg-accent pr-2 pl-3.5 text-white">
         <SchoolName />
         <h1 className="m-0 text-center text-lg font-bold tracking-[0.04em]">{title}</h1>
-        <div className="flex justify-end">
-          {showAdmin && (
-            <button
-              onClick={() => setAdminOpen(!adminOpen)}
-              aria-label="管理用のメニュー"
-              aria-expanded={adminOpen}
-              className="relative flex h-11 w-11 items-center justify-center text-white"
-            >
-              <MenuIcon />
-            </button>
-          )}
-        </div>
-        {adminOpen && (
-          <>
-            <button aria-label="管理用のメニューを閉じる" onClick={() => setAdminOpen(false)} className="anim-fade fixed inset-x-0 top-14 bottom-0 mx-auto max-w-[480px] bg-ink/40" />
-            <div className="pointer-events-none absolute inset-x-0 top-14 h-[100dvh] overflow-hidden">
-              <nav aria-label="管理用のメニュー" className="anim-drop pointer-events-auto flex flex-col rounded-b-2xl bg-white pb-1.5 text-ink shadow-[0_8px_24px_rgba(15,23,42,0.2)]">
-                {canEditMenu(me) && (
-                  <Link href="/admin/options" className="flex min-h-[60px] items-center border-t border-hair px-5 text-[17px]">
-                    メニューの選択肢
-                  </Link>
-                )}
-                {canEditFees(me) && (
-                  <Link href="/admin/fees" className="flex min-h-[60px] items-center border-t border-hair px-5 text-[17px]">
-                    競技場代の料金
-                  </Link>
-                )}
-              </nav>
-            </div>
-          </>
-        )}
+        <div />
       </header>
 
       <main className="flex grow flex-col gap-2.5 px-4 pt-3 pb-24">{children({ db, me, today })}</main>

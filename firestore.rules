@@ -22,7 +22,7 @@ service cloud.firestore {
     function approved() { return signedIn() && exists(meRef()) && me().status == 'approved'; }
     // 顧問・開発者
     function adviser() { return approved() && (me().role == 'adviser' || me().isAdmin == true); }
-    // 部員名簿：部員の登録・入部の承認・部員の削除
+    // 部員の登録・入部の承認・部員の削除
     function approver() { return adviser() || (approved() && me().role in ['captain', 'manager']); }
     // 練習メニュー・選択肢・大会・エントリー・参加
     function menuEditor() { return adviser() || (approved() && me().role in ['captain', 'viceCaptain', 'manager']); }

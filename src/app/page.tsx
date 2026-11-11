@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { BackIcon, DownIcon, NextIcon, PencilIcon, PlusIcon } from "@/components/icons";
+import { BackIcon, DownIcon, NextIcon, PlusIcon } from "@/components/icons";
 import { WarmUpText } from "@/components/WarmUpText";
 import { MainShell } from "@/components/Shell";
-import { chipOff, chipOn, Sheet } from "@/components/ui";
+import { chipOff, chipOn, Sheet, EditButton } from "@/components/ui";
 import { addDays, dayLabel, diffDays } from "@/lib/dates";
 import { approvedMembers, latestGoal } from "@/lib/derived";
 import { feeFor, isPayer, sortMembers } from "@/lib/grade";
 import { itemLine } from "@/lib/menuText";
 import { canEditMenu, writesReflection } from "@/lib/permissions";
 import { setAttendance, setWinter } from "@/lib/store";
+import { showMark } from "@/lib/marks";
 import type { DbState, Member } from "@/lib/types";
 import { familyName } from "@/lib/names";
 
@@ -59,7 +60,7 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
             <div className="flex flex-col gap-1 px-4 pb-3">
               {recentPbs.map((r) => (
                 <p key={r.id} className="m-0 text-sm">
-                  {familyName(db.members[r.memberId].name)}　{r.event}　{r.mark}
+                  {familyName(db.members[r.memberId].name)}　{r.event}　{showMark(r.mark)}
                 </p>
               ))}
             </div>
@@ -85,23 +86,17 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
             <p className="m-0 text-[17px] font-bold">{dayLabel(date)}</p>
             <p className="mt-0.5 mb-0 text-xs text-sub">{sub}</p>
           </div>
-          <div className="flex">
-            {editor ? (
-              <Link href={`/menu/edit?date=${date}`} aria-label="メニューを編集" className="flex h-11 w-10 items-center justify-center text-accent">
-                <PencilIcon />
-              </Link>
-            ) : (
-              <span className="w-10" />
-            )}
-            <button onClick={() => go(1)} disabled={offset >= 7} aria-label="次の日" className="flex h-11 w-10 items-center justify-center text-accent disabled:text-line">
-              <NextIcon size={22} />
-            </button>
-          </div>
+          <button onClick={() => go(1)} disabled={offset >= 7} aria-label="次の日" className="flex h-11 w-11 items-center justify-center text-accent disabled:text-line">
+            <NextIcon size={22} />
+          </button>
         </div>
 
         {menu ? (
           <div className="border-t border-[#E2E8F0]">
-            <p className="m-0 px-4 pt-3.5 pb-2.5 text-[13px] font-bold text-accent">練習メニュー</p>
+            <div className="flex items-center justify-between px-4 pt-3 pb-2">
+              <p className="m-0 text-[13px] font-bold text-accent">練習メニュー</p>
+              {editor && <EditButton small href={`/menu/edit?date=${date}`} ariaLabel="メニューを編集" />}
+            </div>
             {menu.isStadium && <StadiumBlock db={db} me={me} date={date} today={today} />}
             <div className="flex flex-col gap-3 px-4 pb-3.5">
               {menu.warmUp.length > 0 && (
@@ -159,8 +154,9 @@ function MenuBody({ db, me, today }: { db: DbState; me: Member; today: string })
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 border-t border-[#E2E8F0] px-4 py-7 text-center">
-            <p className="m-0 text-sm text-sub">まだ登録されていません</p>
-            {editor && (
+            {/* 過ぎた日は、もう登録しないので案内だけ出す */}
+            <p className="m-0 text-sm text-sub">{date < today ? "メニューは登録されていませんでした" : "まだ登録されていません"}</p>
+            {editor && date >= today && (
               <Link href={`/menu/edit?date=${date}`} className="flex items-center gap-1.5 rounded-full bg-accent-soft px-5 py-2.5 text-sm font-bold text-accent">
                 <PlusIcon />
                 メニューを登録する

@@ -7,8 +7,8 @@ import { MainShell } from "@/components/Shell";
 import { monthLabel } from "@/lib/dates";
 import { athletes, pendingMembers, reflectionStatus } from "@/lib/derived";
 import { gradeOf, GRADES, ROLE_LABEL, sortMembers } from "@/lib/grade";
-import { canApprove, writesReflection } from "@/lib/permissions";
-import { DownIcon, NextIcon } from "@/components/icons";
+import { canApprove, hasEvents, writesReflection } from "@/lib/permissions";
+import { DownIcon, NextIcon, PlusIcon } from "@/components/icons";
 import type { DbState, Member } from "@/lib/types";
 
 export default function MembersPage() {
@@ -16,8 +16,8 @@ export default function MembersPage() {
 }
 
 function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
-  const myGrade = gradeOf(me.graduationYear, today);
-  const [open, setOpen] = useState<string>(myGrade ?? "高2");
+  // 最初は全部の学年を閉じておく
+  const [open, setOpen] = useState<string>("");
   const [q, setQ] = useState("");
   const [showMissing, setShowMissing] = useState(false);
   const list = sortMembers(athletes(db), today);
@@ -27,7 +27,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
   const missing = writers.filter((m) => !db.goals[`${month}_${m.email}`]);
   const ratio = writers.length ? Math.round((submitted.length / writers.length) * 100) : 0;
   const approver = canApprove(me);
-  const pending = approver ? pendingMembers(db).length : 0;
+  const pending = approver ? pendingMembers(db) : [];
   const query = q.trim();
   const groups = [...GRADES].reverse().map((g) => ({ g, people: list.filter((m) => gradeOf(m.graduationYear, today) === g) })).filter((x) => x.people.length);
 
@@ -42,7 +42,8 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
             {mood && <MoodFace kind={mood.mood} />}
           </span>
           <span className="text-xs text-sub">
-            {m.role === "manager" ? ROLE_LABEL.manager : [m.bibNumber, m.events.join(" / ")].filter(Boolean).join("・")}
+            {/* ゼッケンと役職 */}
+            {[hasEvents(m) && m.bibNumber, ROLE_LABEL[m.role]].filter(Boolean).join("・")}
           </span>
         </span>
         {!writesReflection(m) ? null : goal ? (
@@ -56,12 +57,21 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
 
   return (
     <>
-      {approver && (
-        <Link href="/admin/members" className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-4 text-[15px]">
-          <span className="grow">部員名簿</span>
-          {pending > 0 && <span className="rounded-xl bg-[#EF4444] px-2.5 py-[3px] text-xs font-bold text-white">承認待ち {pending}</span>}
-          <NextIcon className="text-line" />
-        </Link>
+      {pending.length > 0 && (
+        <section className="rounded-xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] px-4 pt-3 pb-1">
+          <p className="mt-0 mb-1 text-[13px] font-bold text-danger">承認待ち（{pending.length}件）</p>
+          {pending.map((m) => (
+            <Link
+              key={m.email}
+              href={`/admin/members/edit?id=${encodeURIComponent(m.email)}`}
+              className="flex min-h-12 items-center gap-2 border-t border-[#FEE2E2] text-[15px]"
+            >
+              <span className="grow">{m.name}</span>
+              <span className="text-[13px] text-muted">{gradeOf(m.graduationYear, today)}</span>
+              <NextIcon className="text-danger" />
+            </Link>
+          ))}
+        </section>
       )}
 
       <section className="rounded-xl bg-white px-4 py-2.5">
@@ -127,6 +137,14 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
           <p className="m-0 px-4 py-4 text-sm text-muted">見つかりません</p>
         )}
       </section>
+
+      {/* 部員の登録（顧問・キャプテン・マネージャー）。一覧のいちばん下に置く */}
+      {approver && (
+        <Link href="/admin/members/add" className="mt-1 flex items-center gap-1.5 self-center rounded-full bg-accent-soft px-5 py-2.5 text-sm font-bold text-accent">
+          <PlusIcon />
+          部員を登録する
+        </Link>
+      )}
     </>
   );
 }

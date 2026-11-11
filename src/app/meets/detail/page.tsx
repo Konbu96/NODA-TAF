@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { PencilIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
-import { Card, Label, PbTag, PrimaryLink, RefMark } from "@/components/ui";
+import { Card, Label, PbTag, PrimaryLink, RefMark, EditButton } from "@/components/ui";
 import { rangeLabel } from "@/lib/dates";
 import { isMeetOver, missingRecords } from "@/lib/derived";
-import { ALL_EVENTS, windLabel } from "@/lib/marks";
+import { sortMembers } from "@/lib/grade";
+import { ALL_EVENTS, windLabel, showMark } from "@/lib/marks";
 import { canEditMenu, canEditRecordsOf, isAthlete } from "@/lib/permissions";
 import type { DbState, Meet, Member } from "@/lib/types";
 
@@ -28,17 +28,7 @@ const eventOrder = (e: string) => {
 function Inner() {
   const id = useSearchParams().get("id") ?? "";
   return (
-    <SubShell
-      title="大会"
-      back="/meets"
-      right={({ me }) =>
-        canEditMenu(me) ? (
-          <Link href={`/meets/edit?id=${id}`} aria-label="大会情報を直す" className="flex h-11 w-11 items-center justify-center text-white">
-            <PencilIcon />
-          </Link>
-        ) : null
-      }
-    >
+    <SubShell title="大会" back="/meets">
       {(ctx) => {
         const meet = ctx.db.meets[id];
         if (!meet) return <p className="text-sm text-sub">大会が見つかりません。</p>;
@@ -51,22 +41,27 @@ function Inner() {
 function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string; meet: Meet }) {
   const over = isMeetOver(meet, today);
   const entries = db.entries[meet.id] ?? {};
-  const byEvent: Record<string, Member[]> = {};
-  for (const [email, e] of Object.entries(entries)) {
-    const m = db.members[email];
-    if (!m) continue;
-    for (const ev of e.events) (byEvent[ev] ??= []).push(m);
-  }
-  const events = Object.keys(byEvent).sort((a, b) => eventOrder(a) - eventOrder(b));
-  const mine = entries[me.email];
   const records = Object.values(db.records).filter((r) => r.meetId === meet.id);
+  // 人ごとに並べる（エントリーした人と、記録がある人）
+  const people = sortMembers(
+    [...new Set([...Object.keys(entries), ...records.map((r) => r.memberId)])].map((e) => db.members[e]).filter(Boolean),
+    today,
+  );
+  const entrants = people.filter((m) => entries[m.email]);
+  const byOrder = (a: string, b: string) => eventOrder(a) - eventOrder(b);
+  const mine = entries[me.email];
   const missing = missingRecords(db, meet, me.email, today);
   const editor = canEditMenu(me);
 
   return (
     <>
       <Card className="flex flex-col gap-2 p-4">
-        <p className="m-0 text-xl font-bold">{meet.name}</p>
+        <div className="flex items-start gap-2">
+          <p className="m-0 min-w-0 grow text-xl font-bold">{meet.name}</p>
+          {editor && (
+            <EditButton href={`/meets/edit?id=${meet.id}`} ariaLabel="大会情報を編集" />
+          )}
+        </div>
         <p className="m-0 text-sm text-[#334155]">{rangeLabel(meet.startDate, meet.endDate)}</p>
         {meet.venue && <p className="m-0 text-sm text-[#334155]">{meet.venue}</p>}
         {meet.guidelineUrl && (
@@ -82,24 +77,19 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
             <Label>エントリー（{Object.keys(entries).length}人）</Label>
             {mine && <p className="m-0 text-xs font-bold text-ok">あなた：{mine.events.join("、")}</p>}
           </div>
-          {events.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
-          {events.map((ev) => (
-            <div key={ev} className="flex gap-2.5 text-sm">
-              <span className="w-14 shrink-0 font-bold">{ev}</span>
-              <span className="text-[#334155]">
-                {byEvent[ev].map((m, i) => (
-                  <span key={m.email}>
-                    {i > 0 && "、"}
-                    {editor ? (
-                      <Link href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="underline decoration-line">
-                        {m.name}
-                      </Link>
-                    ) : (
-                      m.name
-                    )}
-                  </span>
-                ))}
+          {entrants.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
+          {entrants.map((m) => (
+            <div key={m.email} className="flex gap-2.5 text-sm">
+              <span className="w-24 shrink-0 font-bold">
+                {editor ? (
+                  <Link href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="underline decoration-line">
+                    {m.name}
+                  </Link>
+                ) : (
+                  m.name
+                )}
               </span>
+              <span className="text-[#334155]">{[...entries[m.email].events].sort(byOrder).join("、")}</span>
             </div>
           ))}
           {isAthlete(me) && me.role !== "manager" && (
@@ -111,41 +101,40 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
       ) : (
         <Card className="flex flex-col gap-2.5">
           <Label>結果</Label>
-          {events.length === 0 && records.length === 0 && <p className="m-0 text-sm text-muted">記録はまだありません</p>}
-          {[...new Set([...events, ...records.map((r) => r.event)])]
-            .sort((a, b) => eventOrder(a) - eventOrder(b))
-            .map((ev) => {
-              const list = records.filter((r) => r.event === ev);
-              const people = byEvent[ev] ?? [];
-              const notYet = people.filter((p) => !list.some((r) => r.memberId === p.email));
-              return (
-                <div key={ev}>
-                  <p className="mt-0 mb-1 text-[13px] font-bold">{ev}</p>
-                  {list.map((r) => (
-                    <div key={r.id} className="flex justify-between py-1 text-sm">
-                      <span>{db.members[r.memberId]?.name}</span>
-                      <span className="flex items-center gap-1">
-                        {r.isWindAssisted && <RefMark small />}
-                        {r.mark}
-                        {r.wind != null && `（${windLabel(r.wind)}）`}
-                        {r.isPB && <PbTag />}
-                        {canEditRecordsOf(me, r.memberId) && r.memberId !== me.email && (
-                          <Link href={`/records/edit?meet=${meet.id}&member=${encodeURIComponent(r.memberId)}`} className="ml-1 text-xs text-accent underline">
-                            直す
-                          </Link>
-                        )}
-                      </span>
+          {people.length === 0 && <p className="m-0 text-sm text-muted">記録はまだありません</p>}
+          {people.map((m) => {
+            const list = records.filter((r) => r.memberId === m.email);
+            const evs = [...new Set([...(entries[m.email]?.events ?? []), ...list.map((r) => r.event)])].sort(byOrder);
+            return (
+              <div key={m.email}>
+                <p className="mt-0 mb-1 flex items-center gap-2 text-[13px] font-bold">
+                  <span className="grow">{m.email === me.email ? "あなた" : m.name}</span>
+                  {/* マネージャーは、ほかの人の記録も直せる */}
+                  {canEditRecordsOf(me, m.email) && m.email !== me.email && (
+                    <EditButton small href={`/records/edit?meet=${meet.id}&member=${encodeURIComponent(m.email)}`} ariaLabel={`${m.name}の記録を編集`} />
+                  )}
+                </p>
+                {evs.map((ev) => {
+                  const r = list.find((x) => x.event === ev);
+                  return (
+                    <div key={ev} className={`flex justify-between py-1 pl-2 text-sm ${r ? "" : m.email === me.email ? "text-warn-dark" : "text-muted"}`}>
+                      <span>{ev}</span>
+                      {r ? (
+                        <span className="flex items-center gap-1">
+                          {r.isWindAssisted && <RefMark small />}
+                          {showMark(r.mark)}
+                          {r.wind != null && `（${windLabel(r.wind)}）`}
+                          {r.isPB && <PbTag />}
+                        </span>
+                      ) : (
+                        <span>未入力</span>
+                      )}
                     </div>
-                  ))}
-                  {notYet.map((p) => (
-                    <div key={p.email} className={`flex justify-between py-1 text-sm ${p.email === me.email ? "text-warn-dark" : "text-muted"}`}>
-                      <span>{p.email === me.email ? "あなた" : p.name}</span>
-                      <span>未入力</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            );
+          })}
           {mine && <PrimaryLink href={`/records/edit?meet=${meet.id}`}>{missing.length ? "自分の記録を入力する" : "自分の記録を直す"}</PrimaryLink>}
         </Card>
       )}

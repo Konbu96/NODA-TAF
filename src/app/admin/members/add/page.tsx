@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CloseIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
-import { Card, Chip, chipOff, chipOn, Label, PrimaryButton, Sheet, Toast } from "@/components/ui";
+import { Card, Chip, chipOff, chipOn, Label, PrimaryButton, Toast } from "@/components/ui";
 import { GRADES, ROLE_LABEL, type Grade } from "@/lib/grade";
-import { EVENT_GROUPS, onlyDigits } from "@/lib/marks";
+import { onlyDigits } from "@/lib/marks";
 import { canApprove, canChangeRole } from "@/lib/permissions";
 import { addMember } from "@/lib/store";
 import type { DbState, Member, Role } from "@/lib/types";
@@ -13,7 +12,7 @@ import type { DbState, Member, Role } from "@/lib/types";
 /** 顧問・開発者が、部員を 1 人ずつ名簿に登録する画面 */
 export default function Page() {
   return (
-    <SubShell title="部員を登録" back="/admin/members">
+    <SubShell title="部員を登録" back="/members">
       {(ctx) => (canApprove(ctx.me) ? <Form {...ctx} /> : <p className="text-sm text-sub">ここを使えるのは顧問・キャプテン・マネージャーだけです。</p>)}
     </SubShell>
   );
@@ -21,7 +20,6 @@ export default function Page() {
 
 const ROLES: Role[] = ["member", "captain", "viceCaptain", "manager", "adviser"];
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
-const GENDERS = ["男", "女"];
 const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
 function Form({ db, me }: { db: DbState; me: Member; today: string }) {
@@ -30,10 +28,7 @@ function Form({ db, me }: { db: DbState; me: Member; today: string }) {
   const [grade, setGrade] = useState<Grade | null>(null);
   const [role, setRole] = useState<Role>("member");
   const [bib, setBib] = useState("");
-  const [gender, setGender] = useState("");
   const [restDay, setRestDay] = useState("");
-  const [events, setEvents] = useState<string[]>([]);
-  const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState("");
 
@@ -53,9 +48,9 @@ function Form({ db, me }: { db: DbState; me: Member; today: string }) {
       grade: adviser ? null : grade,
       role,
       bibNumber: athlete ? bib : "",
-      gender: adviser ? "" : gender,
+      gender: "",
       restDay: adviser ? "" : restDay,
-      events: athlete ? events : [],
+      events: [],
     });
     setBusy(false);
     setAdded(name.trim());
@@ -63,9 +58,7 @@ function Form({ db, me }: { db: DbState; me: Member; today: string }) {
     setName("");
     setEmail("");
     setBib("");
-    setGender("");
     setRestDay("");
-    setEvents([]);
   };
 
   return (
@@ -120,7 +113,7 @@ function Form({ db, me }: { db: DbState; me: Member; today: string }) {
         </Card>
       )}
 
-      {/* 顧問は、ゼッケン・性別・休みの曜日を入れない */}
+      {/* 顧問は、ゼッケン・休みの曜日を入れない */}
       {!adviser && (
         <Card className="flex flex-col gap-3">
           {athlete && (
@@ -135,20 +128,11 @@ function Form({ db, me }: { db: DbState; me: Member; today: string }) {
             </label>
           )}
           <div className="flex flex-col gap-1.5">
-            <Label>性別</Label>
-            <div className="flex gap-1.5">
-              {GENDERS.map((g) => (
-                <Chip key={g} on={gender === g} onClick={() => setGender(gender === g ? "" : g)} className="w-14">
-                  {g}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
             <Label>休みの曜日</Label>
-            <div className="flex flex-wrap gap-1.5">
+            {/* 7 つを 1 段に、画面のはばに合わせて並べる */}
+            <div className="grid grid-cols-7 gap-1">
               {WEEKDAYS.map((d) => (
-                <Chip key={d} on={restDay === `${d}曜日`} onClick={() => setRestDay(restDay === `${d}曜日` ? "" : `${d}曜日`)} className="w-11">
+                <Chip key={d} on={restDay === `${d}曜日`} onClick={() => setRestDay(restDay === `${d}曜日` ? "" : `${d}曜日`)} className="w-full justify-center px-0">
                   {d}
                 </Chip>
               ))}
@@ -157,45 +141,11 @@ function Form({ db, me }: { db: DbState; me: Member; today: string }) {
         </Card>
       )}
 
-      {athlete && (
-        <Card className="flex flex-col gap-1">
-          <Label className="mb-1">専門種目</Label>
-          <p className="mt-0 mb-1 text-[11px] text-muted">PB は、登録したあとに部員のページの ✎ から入れられます。</p>
-          {events.map((ev) => (
-            <div key={ev} className="flex min-h-11 items-center border-t border-hair">
-              <b className="grow text-[15px]">{ev}</b>
-              <button onClick={() => setEvents(events.filter((x) => x !== ev))} aria-label={`${ev} を外す`} className="flex h-9 w-9 items-center justify-center text-[#94A3B8]">
-                <CloseIcon />
-              </button>
-            </div>
-          ))}
-          <button onClick={() => setSheet(true)} className="mt-1.5 h-11 rounded-[10px] border border-dashed border-[#93C5FD] bg-[#F8FAFC] text-sm font-bold text-accent">
-            ＋ 種目を選ぶ
-          </button>
-        </Card>
-      )}
-
       <PrimaryButton onClick={save} disabled={!ready || busy}>
         {busy ? "登録しています…" : "名簿に登録する"}
       </PrimaryButton>
 
-      <Sheet open={sheet} onClose={() => setSheet(false)} title="専門種目">
-        {EVENT_GROUPS.map((g) => (
-          <div key={g.name}>
-            <p className="mt-0 mb-1.5 text-xs font-bold text-sub">{g.name}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {g.events.map((e) => (
-                <Chip key={e} small on={events.includes(e)} onClick={() => setEvents(events.includes(e) ? events.filter((x) => x !== e) : [...events, e])}>
-                  {e}
-                </Chip>
-              ))}
-            </div>
-          </div>
-        ))}
-        <PrimaryButton onClick={() => setSheet(false)}>決定</PrimaryButton>
-      </Sheet>
-
-      {added && <Toast text={`${added} を登録しました`} link={{ href: "/admin/members", label: "名簿へ" }} onDone={() => setAdded("")} />}
+      {added && <Toast text={`${added} を登録しました`} link={{ href: "/members", label: "部員へ" }} onDone={() => setAdded("")} />}
     </>
   );
 }

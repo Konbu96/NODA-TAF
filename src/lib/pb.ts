@@ -1,8 +1,8 @@
-import { isBetter, parseMark, markToDigits } from "./marks";
+import { ALL_EVENTS, isBetter, parseMark, markToDigits } from "./marks";
 import type { DbState, Member, PersonalBest } from "./types";
 
 /** 残っている大会記録と手入力の PB から、その種目の一番良い記録を選ぶ */
-export function bestFor(state: DbState, member: Member, event: string): PersonalBest | null {
+export function bestFor(state: DbState, member: Member, event: string, legalOnly = false): PersonalBest | null {
   const manualMark = member.personalBests.find((p) => p.event === event)?.manualMark ?? "";
   let best: PersonalBest | null = null;
   if (manualMark) {
@@ -21,7 +21,7 @@ export function bestFor(state: DbState, member: Member, event: string): Personal
     }
   }
   const records = Object.values(state.records)
-    .filter((r) => r.memberId === member.email && r.event === event)
+    .filter((r) => r.memberId === member.email && r.event === event && !r.isShort && !(legalOnly && r.isWindAssisted))
     .sort((a, b) => a.date.localeCompare(b.date));
   for (const r of records) {
     if (!best || isBetter(event, r.value, best.value)) {
@@ -54,4 +54,17 @@ export function recomputeAllPBs(state: DbState, member: Member): PersonalBest[] 
     if (b) list.push(b);
   }
   return list;
+}
+
+/** PB が追い風参考のときだけ、参考記録を除いた一番良い記録を返す */
+export function legalBestIfRef(state: DbState, member: Member, event: string): PersonalBest | null {
+  const pb = member.personalBests.find((p) => p.event === event);
+  if (!pb?.isWindAssisted) return null;
+  return bestFor(state, member, event, true);
+}
+
+/** 出たことのある種目（PB がある種目）を、種目の順に並べる */
+export function pbEvents(member: Member): string[] {
+  const order = (e: string) => (ALL_EVENTS.indexOf(e) < 0 ? 999 : ALL_EVENTS.indexOf(e));
+  return [...new Set(member.personalBests.map((p) => p.event))].sort((a, b) => order(a) - order(b));
 }

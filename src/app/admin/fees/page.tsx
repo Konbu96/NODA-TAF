@@ -1,8 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SubShell } from "@/components/Shell";
-import { PrimaryButton, Toast } from "@/components/ui";
+import { PrimaryButton } from "@/components/ui";
 import { onlyDigits } from "@/lib/marks";
 import { canEditFees } from "@/lib/permissions";
 import { saveFees } from "@/lib/store";
@@ -22,7 +23,7 @@ function Body({ db }: { db: DbState }) {
   const [jr, setJr] = useState(String(db.fees.juniorHigh));
   const [hs, setHs] = useState(String(db.fees.highSchool));
   const [wt, setWt] = useState(String(db.fees.winterExtra));
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
   const n = (v: string) => Number(v || 0);
 
   const row = (label: string, value: string, set: (v: string) => void, plus?: boolean, first?: boolean) => (
@@ -55,12 +56,11 @@ function Body({ db }: { db: DbState }) {
       <PrimaryButton
         onClick={async () => {
           await saveFees({ juniorHigh: n(jr), highSchool: n(hs), winterExtra: n(wt) });
-          setSaved(true);
+          router.push("/");
         }}
       >
         保存する
       </PrimaryButton>
-      {saved && <Toast text="料金を保存しました" link={{ href: "/", label: "メニューへ" }} onDone={() => setSaved(false)} />}
     </>
   );
 }

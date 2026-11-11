@@ -1,15 +1,16 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { CloseIcon } from "@/components/icons";
 import { SubShell } from "@/components/Shell";
-import { Card, Chip, Label, PrimaryButton, Sheet, Toast } from "@/components/ui";
-import { gradeOf } from "@/lib/grade";
-import { EVENT_GROUPS, liveMark, markToDigits, onlyDigits, parseMark } from "@/lib/marks";
-import { canEditProfileOf, hasEvents, isAthlete } from "@/lib/permissions";
-import { saveProfile } from "@/lib/store";
-import type { DbState, Member } from "@/lib/types";
+import { Card, Chip, chipOff, chipOn, Label, PrimaryButton, Sheet } from "@/components/ui";
+import { CloseIcon, PlusIcon } from "@/components/icons";
+import { gradeOf, ROLE_LABEL } from "@/lib/grade";
+import { EVENT_GROUPS, liveMark, markToDigits, onlyDigits, showMark } from "@/lib/marks";
+import { pbEvents } from "@/lib/pb";
+import { canChangeRole, canEditProfileOf, hasEvents, isAthlete } from "@/lib/permissions";
+import { saveProfile, updateMember } from "@/lib/store";
+import type { DbState, Member, Role } from "@/lib/types";
 
 export default function Page() {
   return (
@@ -34,22 +35,29 @@ function Inner() {
   );
 }
 
-const GENDERS = ["男", "女"];
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
+const ROLES: Role[] = ["member", "captain", "viceCaptain", "manager", "adviser"];
 
 function Form({ target, me, today }: { db: DbState; target: Member; me: Member; today: string }) {
+  const [role, setRole] = useState<Role>(target.role);
   const [bib, setBib] = useState(target.bibNumber);
-  const [gender, setGender] = useState(target.gender ?? "");
   const [restDay, setRestDay] = useState(target.restDay ?? "");
-  const [events, setEvents] = useState<string[]>(target.events);
-  const [raw, setRaw] = useState<Record<string, string>>(() =>
-    Object.fromEntries(target.personalBests.filter((p) => p.manualMark).map((p) => [p.event, markToDigits(p.manualMark)])),
+  // PB：出たことのある種目ごとに、今の PB（手入力があればそれ）を入れておく
+  const [pbs, setPbs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      pbEvents(target).map((ev) => {
+        const p = target.personalBests.find((x) => x.event === ev);
+        return [ev, markToDigits(p?.manualMark || "")];
+      }),
+    ),
   );
-  const [sheet, setSheet] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [addSheet, setAddSheet] = useState(false);
+  const router = useRouter();
   const self = me.email === target.email;
-  // マネージャー・顧問には、ゼッケン・専門種目・PB の欄を出さない
-  const athlete = hasEvents(target);
+  // マネージャー・顧問には、ゼッケンの欄を出さない
+  const athlete = hasEvents({ ...target, role });
+  // 役職を変えられるのは顧問・開発者だけ
+  const roleEditable = canChangeRole(me);
 
   return (
     <>
@@ -57,6 +65,19 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
         <p className="m-0 text-lg font-bold">{target.name}</p>
         <p className="mt-0.5 mb-0 text-[13px] text-muted">{gradeOf(target.graduationYear, today)}</p>
       </section>
+
+      {roleEditable && (
+        <Card className="flex flex-col gap-2">
+          <Label>役職</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {ROLES.map((r) => (
+              <button key={r} onClick={() => setRole(r)} className={`h-9 rounded-full px-3.5 text-[13px] ${role === r ? chipOn : chipOff}`}>
+                {ROLE_LABEL[r]}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {athlete && (
         <Card className="flex flex-col gap-2">
@@ -72,24 +93,15 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
         </Card>
       )}
 
-      {/* 顧問は性別・休みの曜日を持たない */}
-      {isAthlete(target) && (
+      {/* 顧問は休みの曜日を持たない */}
+      {isAthlete({ ...target, role }) && (
         <Card className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label>性別</Label>
-            <div className="flex gap-1.5">
-              {GENDERS.map((g) => (
-                <Chip key={g} on={gender === g} onClick={() => setGender(gender === g ? "" : g)} className="w-14 justify-center">
-                  {g}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
             <Label>休みの曜日</Label>
-            <div className="flex flex-wrap gap-1.5">
+            {/* 7 つを 1 段に、画面のはばに合わせて並べる */}
+            <div className="grid grid-cols-7 gap-1">
               {WEEKDAYS.map((d) => (
-                <Chip key={d} on={restDay === `${d}曜日`} onClick={() => setRestDay(restDay === `${d}曜日` ? "" : `${d}曜日`)} className="w-11 justify-center">
+                <Chip key={d} on={restDay === `${d}曜日`} onClick={() => setRestDay(restDay === `${d}曜日` ? "" : `${d}曜日`)} className="w-full justify-center px-0">
                   {d}
                 </Chip>
               ))}
@@ -100,78 +112,82 @@ function Form({ target, me, today }: { db: DbState; target: Member; me: Member; 
 
       {athlete && (
         <Card className="flex flex-col gap-1">
-          <Label className="mb-1">専門種目と PB</Label>
-          <p className="mt-0 mb-1 text-[11px] text-muted">PB はアプリを使い始める前のベストを入れてください。大会の記録を入れると自動で更新されます。</p>
-          {events.map((ev) => {
-            const d = raw[ev] ?? "";
-            const parsed = parseMark(ev, d);
+          <Label>PB</Label>
+          <p className="mt-0 mb-0.5 text-xs font-bold text-sub">数字のみで入力してください（例：1205 → 12.05）</p>
+          <p className="mt-0 mb-1 text-[11px] text-muted">大会の記録から自動で入ります。アプリを使う前のベストは、ここに手で入れてください。</p>
+          {Object.keys(pbs).length === 0 && <p className="m-0 text-sm text-muted">まだありません</p>}
+          {Object.entries(pbs).map(([ev, d]) => {
             const recordPb = target.personalBests.find((p) => p.event === ev && p.recordId);
             return (
               <div key={ev} className="flex min-h-14 items-center gap-2.5 border-t border-hair py-1.5">
-                <b className="w-16 shrink-0 text-[15px]">{ev}</b>
-                <div className="flex grow flex-col gap-0.5">
+                <b className="w-24 shrink-0 text-[15px]">{ev}</b>
+                <div className="flex min-w-0 grow flex-col gap-0.5">
                   <input
                     inputMode="numeric"
                     placeholder="数字のみ入力"
                     value={liveMark(ev, d)}
-                    onChange={(e) => setRaw({ ...raw, [ev]: onlyDigits(e.target.value) })}
+                    onChange={(e) => setPbs({ ...pbs, [ev]: onlyDigits(e.target.value) })}
                     aria-label={`${ev} の PB`}
                     className="h-11 w-full rounded-[10px] border border-line px-3 text-base"
                   />
-                  {parsed && <span className="text-xs text-muted">{parsed.mark} として保存します</span>}
-                  {recordPb && <span className="text-xs text-accent">大会の PB：{recordPb.mark}</span>}
+                  {recordPb && <span className="text-xs text-accent">大会の PB：{showMark(recordPb.mark)}</span>}
                 </div>
-                <button onClick={() => setEvents(events.filter((x) => x !== ev))} aria-label={`${ev} を外す`} className="flex h-9 w-9 items-center justify-center text-[#94A3B8]">
-                  <CloseIcon />
-                </button>
+                {!recordPb && (
+                  <button
+                    onClick={() => setPbs(Object.fromEntries(Object.entries(pbs).filter(([k]) => k !== ev)))}
+                    aria-label={`${ev} の PB を消す`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center text-[#94A3B8]"
+                  >
+                    <CloseIcon />
+                  </button>
+                )}
               </div>
             );
           })}
-          <button onClick={() => setSheet(true)} className="mt-1.5 h-11 rounded-[10px] border border-dashed border-[#93C5FD] bg-[#F8FAFC] text-sm font-bold text-accent">
-            ＋ 種目を選ぶ
+          <button onClick={() => setAddSheet(true)} className="mt-1.5 flex items-center gap-1.5 self-center rounded-full bg-accent-soft px-5 py-2.5 text-sm font-bold text-accent">
+            <PlusIcon />
+            PB を追加
           </button>
         </Card>
       )}
 
+      <Sheet open={addSheet} onClose={() => setAddSheet(false)} title="どの種目の PB？">
+        {EVENT_GROUPS.map((g) => {
+          const list = g.events.filter((e) => !(e in pbs));
+          if (!list.length) return null;
+          return (
+            <div key={g.name}>
+              <p className="mt-0 mb-1.5 text-xs font-bold text-sub">{g.name}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {list.map((e) => (
+                  <Chip
+                    key={e}
+                    small
+                    on={false}
+                    onClick={() => {
+                      setPbs({ ...pbs, [e]: "" });
+                      setAddSheet(false);
+                    }}
+                  >
+                    {e}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </Sheet>
+
       <PrimaryButton
         onClick={async () => {
-          await saveProfile(target.email, { bibNumber: bib, gender, restDay }, events, raw);
-          setSaved(true);
+          await saveProfile(target.email, { bibNumber: bib, gender: target.gender ?? "", restDay }, target.events, pbs);
+          if (roleEditable && role !== target.role) await updateMember(target.email, { role });
+          // 保存したら、来た画面に戻る
+          router.push(self ? "/mypage" : `/members/detail?id=${encodeURIComponent(target.email)}`);
         }}
       >
         保存する
       </PrimaryButton>
-
-      <Sheet open={sheet} onClose={() => setSheet(false)} title="専門種目">
-        {EVENT_GROUPS.map((g) => (
-          <div key={g.name}>
-            <p className="mt-0 mb-1.5 text-xs font-bold text-sub">{g.name}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {g.events.map((e) => (
-                <Chip key={e} small on={events.includes(e)} onClick={() => setEvents(events.includes(e) ? events.filter((x) => x !== e) : [...events, e])}>
-                  {e}
-                </Chip>
-              ))}
-            </div>
-          </div>
-        ))}
-        <PrimaryButton onClick={() => setSheet(false)}>決定</PrimaryButton>
-      </Sheet>
-
-      {saved && (
-        <Toast
-          text="保存しました"
-          link={
-            self
-              ? { href: "/mypage", label: "マイページへ" }
-              : {
-                  href: `/members/detail?id=${encodeURIComponent(target.email)}`,
-                  label: "部員のページへ",
-                }
-          }
-          onDone={() => setSaved(false)}
-        />
-      )}
     </>
   );
 }

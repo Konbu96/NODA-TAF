@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { nowIso, todayStr } from "./dates";
 import { graduationYearFor, type Grade } from "./grade";
-import { isBetter, parseMark, WIND_EVENTS, windValue } from "./marks";
+import { isBetter, parseMark, renameEvent, WIND_EVENTS, windValue } from "./marks";
 import { authSignOut, emailSignIn, emailSignUp, emptyDb, startSync, USE_FIREBASE, writeDiff } from "./firebase";
 import { bestFor, recomputeAllPBs } from "./pb";
 import { createSeed } from "./seed";
@@ -39,7 +39,7 @@ function load() {
         emit();
       },
       onData: (patch) => {
-        state = { ...(state as DbState), ...patch };
+        state = { ...(state as DbState), ...renameEventsIn(patch) };
         emit();
       },
       onReady: () => {
@@ -66,6 +66,31 @@ function load() {
   }
   addWarmUpDetailsOnce();
   fillMemberDefaults();
+  state = { ...state, ...renameEventsIn(state) };
+}
+
+/** 種目名を変えたときに、保存済みの記録・エントリー・PB の種目名を今の名前に読みかえる */
+function renameEventsIn(p: Partial<DbState>): Partial<DbState> {
+  const out: Partial<DbState> = { ...p };
+  if (p.records)
+    out.records = Object.fromEntries(Object.entries(p.records).map(([k, r]) => [k, renameEvent(r.event) === r.event ? r : { ...r, event: renameEvent(r.event) }]));
+  if (p.entries)
+    out.entries = Object.fromEntries(
+      Object.entries(p.entries).map(([id, list]) => [
+        id,
+        Object.fromEntries(Object.entries(list).map(([e, x]) => [e, x.events.some((v) => renameEvent(v) !== v) ? { ...x, events: x.events.map(renameEvent) } : x])),
+      ]),
+    );
+  if (p.members)
+    out.members = Object.fromEntries(
+      Object.entries(p.members).map(([e, m]) => [
+        e,
+        m.personalBests?.some((b) => renameEvent(b.event) !== b.event) || m.events?.some((v) => renameEvent(v) !== v)
+          ? { ...m, events: m.events.map(renameEvent), personalBests: m.personalBests.map((b) => ({ ...b, event: renameEvent(b.event) })) }
+          : m,
+      ]),
+    );
+  return out;
 }
 
 /** 前に保存されたお試しデータの部員に、あとから足した項目（性別・休みの曜日）を空で入れる */
@@ -285,18 +310,16 @@ export function saveProfile(
 ) {
   update((s) => {
     const m = s.members[email];
-    const pbs = events.map((ev) => {
+    // 手入力の PB は、専門種目でなくても（リレーなど）入れたものを残す。空にした種目は消す
+    const all = [...new Set([...events, ...Object.keys(manualDigits), ...m.personalBests.map((p) => p.event)])];
+    const pbs = all.map((ev) => {
       const old = m.personalBests.find((p) => p.event === ev);
-      const parsed = parseMark(ev, manualDigits[ev] ?? "");
-      return {
-        event: ev, mark: parsed?.mark ?? "", value: parsed?.value ?? 0, isWindAssisted: false,
-        date: "", meetName: "", recordId: "", manualMark: parsed?.mark ?? "",
-        ...(old && !parsed ? { manualMark: "" } : {}),
-      };
+      const manualMark = parseMark(ev, manualDigits[ev] ?? "")?.mark ?? "";
+      return old
+        ? { ...old, manualMark }
+        : { event: ev, mark: "", value: 0, isWindAssisted: false, date: "", meetName: "", recordId: "", manualMark };
     });
-    // 専門から外した種目でも、大会記録の PB は残す
-    const kept = m.personalBests.filter((p) => !events.includes(p.event)).map((p) => ({ ...p, manualMark: "" }));
-    const next: Member = { ...m, bibNumber, gender, restDay, events, personalBests: [...pbs, ...kept], updatedAt: nowIso() };
+    const next: Member = { ...m, bibNumber, gender, restDay, events, personalBests: pbs, updatedAt: nowIso() };
     next.personalBests = recomputeAllPBs(s, next);
     return { ...s, members: { ...s.members, [email]: next } };
   });
@@ -379,7 +402,7 @@ export function saveFees(fees: Fees) {
 
 // ---------- 大会・記録 ----------
 
-export type RecordInput = { event: string; digits: string; windDigits: string; minus: boolean };
+export type RecordInput = { event: string; digits: string; windDigits: string; minus: boolean; short?: boolean };
 export type PbUpdate = { event: string; mark: string; isWindAssisted: boolean; diff: number | null; before: number | null };
 
 /** 記録を保存し、PB が更新された種目を返す */
@@ -392,6 +415,16 @@ export function saveRecords(meet: Meet, email: string, inputs: RecordInput[], by
       const existing = Object.values(records).find(
         (r) => r.memberId === email && r.meetId === meet.id && r.event === inp.event,
       );
+      // ショート：記録なし。PB には使わない
+      if (inp.short) {
+        const id = existing?.id ?? `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        records[id] = {
+          id, memberId: email, date: meet.startDate, meetId: meet.id, meetName: meet.name, event: inp.event,
+          mark: "ショート", value: 0, wind: null, isWindAssisted: false, isPB: false, isShort: true,
+          updatedBy: by, updatedAt: nowIso(),
+        };
+        continue;
+      }
       const parsed = parseMark(inp.event, inp.digits);
       if (!parsed) {
         if (existing && !inp.digits) delete records[existing.id];
