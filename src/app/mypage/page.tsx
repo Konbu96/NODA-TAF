@@ -17,7 +17,7 @@ import { formatValue, lowerIsBetter, showMark } from "@/lib/marks";
 import { isAthlete, writesReflection } from "@/lib/permissions";
 import { addWarmUp, logout, saveWarmUpDetail } from "@/lib/store";
 import { USE_FIREBASE } from "@/lib/firebase";
-import { disablePush, enablePush, pushState, type PushState } from "@/lib/push";
+import { disablePush, enablePush, pushState, sendTest, type PushState } from "@/lib/push";
 import type { DbState, Member } from "@/lib/types";
 
 export default function MyPage() {
@@ -241,6 +241,7 @@ function WarmUpDetails({ db, today }: { db: DbState; today: string }) {
 function NotifyCard({ email }: { email: string }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
+  const [test, setTest] = useState("");
   useEffect(() => {
     pushState().then(setState);
   }, []);
@@ -279,6 +280,23 @@ function NotifyCard({ email }: { email: string }) {
         )}
       </div>
       <p className="m-0 text-[13px] leading-relaxed text-sub">{note[state]}</p>
+      {state === "on" && (
+        <>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setTest("送っています…");
+              setTest(await sendTest(email).catch((e) => `送れませんでした（${(e as Error).message}）`));
+              setBusy(false);
+            }}
+            className="self-start p-0 text-[13px] text-accent underline disabled:opacity-50"
+          >
+            テスト通知を送る
+          </button>
+          {test && <p className="m-0 text-xs leading-relaxed break-all text-muted">{test}</p>}
+        </>
+      )}
     </Card>
   );
 }

@@ -97,6 +97,9 @@ export async function POST(req: Request) {
       url: "/",
       tag: `menu-${body.date}`,
     };
+  } else if (body.kind === "test") {
+    // マイページの「テスト通知を送る」：自分のスマホにだけ送る
+    message = { title: "テスト通知", body: "通知は届いています 👍", url: "/mypage", tag: "test" };
   } else {
     return Response.json({ error: "知らせる内容がわかりません" }, { status: 400 });
   }
@@ -104,20 +107,24 @@ export async function POST(req: Request) {
   const webpush = await import("web-push");
   webpush.setVapidDetails("https://noda-taf.vercel.app", process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
   const subs = await db.collection("pushSubscriptions").get();
+  const test = body.kind === "test";
+  // テストは自分にだけ、ふだんは自分以外に送る
+  const targets = subs.docs.filter((d) => (d.data().email === email) === test);
   let sent = 0;
+  const errors: string[] = [];
   await Promise.all(
-    subs.docs.map(async (d) => {
+    targets.map(async (d) => {
       const s = d.data() as { email: string; subscription: PushSubscription };
-      if (s.email === email) return; // 自分には送らない
       try {
         await webpush.sendNotification(s.subscription, JSON.stringify(message), { TTL: 60 * 60 * 24 });
         sent++;
       } catch (e) {
-        // もう使われていない送り先は消す
         const code = (e as { statusCode?: number }).statusCode;
+        errors.push(`${code ?? ""} ${(e as { body?: string }).body ?? (e as Error).message}`.slice(0, 120));
+        // もう使われていない送り先は消す
         if (code === 404 || code === 410) await d.ref.delete().catch(() => {});
       }
     }),
   );
-  return Response.json({ sent });
+  return Response.json({ all: subs.size, targets: targets.length, sent, errors });
 }

@@ -68,6 +68,27 @@ export async function disablePush(): Promise<PushState> {
   return "off";
 }
 
+/** マイページの「テスト通知を送る」：送り先を保存し直してから、自分にだけ送る。結果を文にして返す */
+export async function sendTest(email: string): Promise<string> {
+  try {
+    if ((await enablePush(email)) !== "on") return "通知が許可されていません";
+  } catch (e) {
+    return `送り先を保存できませんでした（${(e as Error).message}）`;
+  }
+  const token = await idToken();
+  if (!token) return "ログインし直してください";
+  const res = await fetch("/api/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ kind: "test" }),
+  });
+  const r = (await res.json().catch(() => ({}))) as { error?: string; all?: number; targets?: number; sent?: number; errors?: string[] };
+  if (r.error) return `送れませんでした（${r.error}）`;
+  if (!r.targets) return `このスマホの送り先が見つかりません（全部で ${r.all ?? 0} 件）`;
+  if (r.errors?.length) return `送れませんでした（${r.errors.join(" / ")}）`;
+  return `送りました（${r.sent} 件）。数秒で届きます`;
+}
+
 /** 練習メニューを登録・変更したことを、みんなに知らせる（失敗しても保存には関係ない） */
 export async function notifyMenu(date: string, isNew: boolean) {
   if (!USE_FIREBASE) return;
