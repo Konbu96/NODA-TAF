@@ -282,18 +282,23 @@ function NotifyCard({ email }: { email: string }) {
       <p className="m-0 text-[13px] leading-relaxed text-sub">{note[state]}</p>
       {state === "on" && (
         <>
-          <button
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setTest("送っています…");
-              setTest(await sendTest(email).catch((e) => `送れませんでした（${(e as Error).message}）`));
-              setBusy(false);
-            }}
-            className="self-start p-0 text-[13px] text-accent underline disabled:opacity-50"
-          >
-            テスト通知を送る
-          </button>
+          <div className="flex gap-5">
+            {[false, true].map((delay) => (
+              <button
+                key={String(delay)}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setTest("送っています…");
+                  setTest(await sendTest(email, delay).catch((e) => `送れませんでした（${(e as Error).message}）`));
+                  setBusy(false);
+                }}
+                className="p-0 text-[13px] text-accent underline disabled:opacity-50"
+              >
+                {delay ? "10秒後に送る" : "テスト通知を送る"}
+              </button>
+            ))}
+          </div>
           {test && <p className="m-0 text-xs leading-relaxed break-all text-muted">{test}</p>}
         </>
       )}

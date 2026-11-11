@@ -10,6 +10,7 @@ import type { PushSubscription } from "web-push";
 //   NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY … 通知の鍵（.env.local と同じもの）
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 // 読み込みに失敗したときに理由を返せるよう、使うときに読み込む
 async function admin() {
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
   const me = (await db.doc(`members/${email}`).get()).data();
   if (!me || me.status !== "approved") return Response.json({ error: "部員ではありません" }, { status: 403 });
 
-  const body = (await req.json().catch(() => ({}))) as { kind?: string; date?: string; isNew?: boolean };
+  const body = (await req.json().catch(() => ({}))) as { kind?: string; date?: string; isNew?: boolean; delay?: boolean };
   let message: { title: string; body: string; url: string; tag: string };
   if (body.kind === "menu" && typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
     if (!(me.isAdmin === true || MENU_ROLES.includes(me.role))) return Response.json({ error: "担当者ではありません" }, { status: 403 });
@@ -104,6 +105,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "知らせる内容がわかりません" }, { status: 400 });
   }
 
+  // 「10秒後に送る」：アプリを閉じてから届くかを試せるように待つ
+  if (body.kind === "test" && body.delay) await new Promise((r) => setTimeout(r, 10_000));
+
   const webpush = await import("web-push");
   webpush.setVapidDetails("https://noda-taf.vercel.app", process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
   const subs = await db.collection("pushSubscriptions").get();
@@ -116,7 +120,7 @@ export async function POST(req: Request) {
     targets.map(async (d) => {
       const s = d.data() as { email: string; subscription: PushSubscription };
       try {
-        await webpush.sendNotification(s.subscription, JSON.stringify(message), { TTL: 60 * 60 * 24 });
+        await webpush.sendNotification(s.subscription, JSON.stringify(message), { TTL: 60 * 60 * 24, urgency: "high" });
         sent++;
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;

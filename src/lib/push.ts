@@ -69,7 +69,7 @@ export async function disablePush(): Promise<PushState> {
 }
 
 /** マイページの「テスト通知を送る」：送り先を保存し直してから、自分にだけ送る。結果を文にして返す */
-export async function sendTest(email: string): Promise<string> {
+export async function sendTest(email: string, delay = false): Promise<string> {
   try {
     if ((await enablePush(email)) !== "on") return "通知が許可されていません";
   } catch (e) {
@@ -77,11 +77,14 @@ export async function sendTest(email: string): Promise<string> {
   }
   const token = await idToken();
   if (!token) return "ログインし直してください";
-  const res = await fetch("/api/notify", {
+  const req = fetch("/api/notify", {
     method: "POST",
+    keepalive: true,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ kind: "test" }),
+    body: JSON.stringify({ kind: "test", delay }),
   });
+  if (delay) return "10秒後に届きます。今すぐアプリを閉じてください";
+  const res = await req;
   const r = (await res.json().catch(() => ({}))) as { error?: string; all?: number; targets?: number; sent?: number; errors?: string[] };
   if (r.error) return `送れませんでした（${r.error}）`;
   if (!r.targets) return `このスマホの送り先が見つかりません（全部で ${r.all ?? 0} 件）`;
