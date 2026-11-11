@@ -1,7 +1,4 @@
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-import * as webpush from "web-push";
+import type { PushSubscription } from "web-push";
 
 // 通知を送るサーバーの処理（Vercel で動く）。
 // アプリから「メニューを登録した」などと頼まれたら、頼んだ人が本当に担当者かを確かめて、
@@ -13,11 +10,30 @@ import * as webpush from "web-push";
 
 export const runtime = "nodejs";
 
-function admin() {
-  const app =
-    getApps()[0] ??
-    initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT ?? "{}")) });
+// 読み込みに失敗したときに理由を返せるよう、使うときに読み込む
+async function admin() {
+  const { cert, getApps, initializeApp } = await import("firebase-admin/app");
+  const { getAuth } = await import("firebase-admin/auth");
+  const { getFirestore } = await import("firebase-admin/firestore");
+  const app = getApps()[0] ?? initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT ?? "{}")) });
   return { auth: getAuth(app), db: getFirestore(app) };
+}
+
+/** 動いているかの確認用（鍵の中身は返さない） */
+export async function GET() {
+  const out: Record<string, string> = { node: process.version };
+  for (const [name, load] of [
+    ["firebase-admin", () => import("firebase-admin/app")],
+    ["web-push", () => import("web-push")],
+  ] as const) {
+    try {
+      await load();
+      out[name] = "ok";
+    } catch (e) {
+      out[name] = (e as Error).message.slice(0, 200);
+    }
+  }
+  return Response.json(out);
 }
 
 /** メニューを登録できる役職（src/lib/permissions.ts の canEditMenu と同じ） */
@@ -46,7 +62,7 @@ export async function POST(req: Request) {
   if (missing.length) return Response.json({ error: `FIREBASE_SERVICE_ACCOUNT に ${missing.join("・")} がありません`, keys: Object.keys(parsed ?? {}) }, { status: 500 });
   let auth, db;
   try {
-    ({ auth, db } = admin());
+    ({ auth, db } = await admin());
   } catch (e) {
     return Response.json({ error: `Firebase の準備に失敗しました：${(e as Error).message.slice(0, 120)}` }, { status: 500 });
   }
@@ -76,12 +92,13 @@ export async function POST(req: Request) {
     return Response.json({ error: "知らせる内容がわかりません" }, { status: 400 });
   }
 
+  const webpush = await import("web-push");
   webpush.setVapidDetails("https://noda-taf.vercel.app", process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
   const subs = await db.collection("pushSubscriptions").get();
   let sent = 0;
   await Promise.all(
     subs.docs.map(async (d) => {
-      const s = d.data() as { email: string; subscription: webpush.PushSubscription };
+      const s = d.data() as { email: string; subscription: PushSubscription };
       if (s.email === email) return; // 自分には送らない
       try {
         await webpush.sendNotification(s.subscription, JSON.stringify(message), { TTL: 60 * 60 * 24 });
