@@ -35,7 +35,21 @@ export async function POST(req: Request) {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
     return Response.json({ error: "通知の設定がまだです" }, { status: 503 });
   }
-  const { auth, db } = admin();
+  // 鍵の中身は返さず、どこがおかしいかだけ返す
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } catch {
+    return Response.json({ error: "FIREBASE_SERVICE_ACCOUNT が JSON として読めません（ファイルの中身を { から } まで全部貼ってください）" }, { status: 500 });
+  }
+  const missing = ["project_id", "client_email", "private_key"].filter((k) => typeof parsed?.[k] !== "string");
+  if (missing.length) return Response.json({ error: `FIREBASE_SERVICE_ACCOUNT に ${missing.join("・")} がありません`, keys: Object.keys(parsed ?? {}) }, { status: 500 });
+  let auth, db;
+  try {
+    ({ auth, db } = admin());
+  } catch (e) {
+    return Response.json({ error: `Firebase の準備に失敗しました：${(e as Error).message.slice(0, 120)}` }, { status: 500 });
+  }
 
   // 頼んだ人を確かめる
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "");
