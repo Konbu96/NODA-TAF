@@ -61,6 +61,8 @@ self.addEventListener("push", (e) => {
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       tag: d.tag,
+      // 同じ種類の通知を上書きするときも、もう一度音・バナーで知らせる
+      renotify: !!d.tag,
       data: { url: d.url || "/" },
     }),
   );

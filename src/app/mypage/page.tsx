@@ -295,7 +295,7 @@ function NotifyCard({ email }: { email: string }) {
                 }}
                 className="p-0 text-[13px] text-accent underline disabled:opacity-50"
               >
-                {delay ? "10秒後に送る" : "テスト通知を送る"}
+                {delay ? "3秒後に送る" : "テスト通知を送る"}
               </button>
             ))}
           </div>
