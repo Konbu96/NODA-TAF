@@ -132,8 +132,8 @@ export async function POST(req: Request) {
     return { all: subs.size, targets: targets.length, sent, errors };
   };
 
-  // 「3秒後に送る」：受け付けたことをすぐ返してから、3秒待って送る（アプリを閉じても届くかを試す）
-  if (body.kind === "test" && body.delay) {
+  // メニューの保存と「3秒後に送る」：受け付けたことをすぐ返してから、3秒待って送る
+  if (body.kind === "menu" || (body.kind === "test" && body.delay)) {
     after(async () => {
       await new Promise((r) => setTimeout(r, 3_000));
       await send();
