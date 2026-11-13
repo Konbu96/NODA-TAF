@@ -9,8 +9,7 @@ import { bestFor, recomputeAllPBs } from "./pb";
 import { createSeed } from "./seed";
 import { WARM_UP_DETAILS } from "./warmUpSeed";
 import type {
-  DbState, Fees, Meet, Member, MoodKind, PracticeMenu, PracticeOptions, RecordDoc, Role, StabroDistance,
-} from "./types";
+  DbState, Fees, Meet, Member, MoodKind, PracticeMenu, PracticeOptions, RecordDoc, Role, StabroDistance, HeatLane } from "./types";
 
 /*
  * データ置き場。画面からは useStore() で全体を読み、下の actions で書き込む（どれも Promise を返す）。
@@ -490,10 +489,19 @@ export function deleteMeet(id: string) {
   return done();
 }
 
-export function saveEntry(meetId: string, email: string, events: string[], by: string) {
+export function saveEntry(meetId: string, email: string, events: string[], by: string, lanes: Record<string, HeatLane> = {}) {
+  // 出る種目の分だけ、入っている組・レーンを残す（Firestore は undefined を保存できないので、空のものは入れない）
+  const kept: Record<string, HeatLane> = {};
+  for (const ev of events) {
+    const l = lanes[ev];
+    const v: HeatLane = {};
+    if (l?.heat) v.heat = l.heat;
+    if (l?.lane) v.lane = l.lane;
+    if (v.heat || v.lane) kept[ev] = v;
+  }
   update((s) => {
     const list = { ...(s.entries[meetId] ?? {}) };
-    if (events.length) list[email] = { events, updatedBy: by, updatedAt: nowIso() };
+    if (events.length) list[email] = { events, ...(Object.keys(kept).length ? { lanes: kept } : {}), updatedBy: by, updatedAt: nowIso() };
     else delete list[email];
     return { ...s, entries: { ...s.entries, [meetId]: list } };
   });

@@ -8,9 +8,9 @@ import { Card, Label, PbTag, PrimaryLink, RefMark, EditButton } from "@/componen
 import { rangeLabel } from "@/lib/dates";
 import { isMeetOver, missingRecords } from "@/lib/derived";
 import { sortMembers } from "@/lib/grade";
-import { ALL_EVENTS, windLabel, showMark } from "@/lib/marks";
-import { canEditMenu, canEditRecordsOf, isAthlete } from "@/lib/permissions";
-import type { DbState, Meet, Member } from "@/lib/types";
+import { ALL_EVENTS, heatLaneLabel, windLabel, showMark } from "@/lib/marks";
+import { canEditMenu, canEditRecordsOf, hasEvents, isAthlete } from "@/lib/permissions";
+import type { DbState, Entry, Meet, Member } from "@/lib/types";
 
 export default function Page() {
   return (
@@ -24,6 +24,16 @@ const eventOrder = (e: string) => {
   const i = ALL_EVENTS.indexOf(e);
   return i < 0 ? 999 : i;
 };
+
+/** 100m（2組4レーン）、200m … のように、種目と組・レーンを並べる */
+const entryText = (e: Entry) =>
+  [...e.events]
+    .sort((a, b) => eventOrder(a) - eventOrder(b))
+    .map((ev) => {
+      const l = heatLaneLabel(e.lanes?.[ev]);
+      return l ? `${ev}（${l}）` : ev;
+    })
+    .join("、");
 
 function Inner() {
   const id = useSearchParams().get("id") ?? "";
@@ -75,7 +85,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
         <Card className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between">
             <Label>エントリー（{Object.keys(entries).length}人）</Label>
-            {mine && <p className="m-0 text-xs font-bold text-ok">あなた：{mine.events.join("、")}</p>}
+            {mine && <p className="m-0 text-xs font-bold text-ok">あなた：{entryText(mine)}</p>}
           </div>
           {entrants.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
           {entrants.map((m) => (
@@ -89,7 +99,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
                   m.name
                 )}
               </span>
-              <span className="text-[#334155]">{[...entries[m.email].events].sort(byOrder).join("、")}</span>
+              <span className="text-[#334155]">{entryText(entries[m.email])}</span>
             </div>
           ))}
           {isAthlete(me) && me.role !== "manager" && (
@@ -138,6 +148,31 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
           {mine && <PrimaryLink href={`/records/edit?meet=${meet.id}`}>{missing.length ? "自分の記録を入力する" : "自分の記録を直す"}</PrimaryLink>}
         </Card>
       )}
+
+      {/* 開発者だけ：大会の前でも後でも、だれのエントリーでも入力・修正できる */}
+      {me.isAdmin && <AdminEntries db={db} meet={meet} today={today} />}
     </>
+  );
+}
+
+/** 開発者用：部員全員のエントリーを一覧にして、名前から直せる（まだの人も入力できる） */
+function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: string }) {
+  const entries = db.entries[meet.id] ?? {};
+  const athletes = sortMembers(
+    Object.values(db.members).filter((m) => m.status === "approved" && hasEvents(m)),
+    today,
+  );
+  return (
+    <Card className="flex flex-col gap-2.5">
+      <Label>エントリーを編集（開発者）</Label>
+      {athletes.map((m) => (
+        <Link key={m.email} href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="flex gap-2.5 text-sm">
+          <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
+          <span className={entries[m.email] ? "text-[#334155]" : "text-muted"}>
+            {entries[m.email] ? entryText(entries[m.email]) : "なし"}
+          </span>
+        </Link>
+      ))}
+    </Card>
   );
 }

@@ -137,3 +137,9 @@ export function formatValue(event: string, v: number): string {
   const s = v - m * 60;
   return m ? `${m}:${s.toFixed(2).padStart(5, "0")}` : s.toFixed(2);
 }
+
+/** 組・レーンの文字（2組4レーン、2組、4レーン）。どちらもなければ空 */
+export function heatLaneLabel(l?: { heat?: number; lane?: number }): string {
+  if (!l) return "";
+  return `${l.heat ? `${l.heat}組` : ""}${l.lane ? `${l.lane}レーン` : ""}`;
+}

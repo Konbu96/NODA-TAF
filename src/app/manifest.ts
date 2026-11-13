@@ -10,7 +10,7 @@ export default function manifest(): MetadataRoute.Manifest & { handle_links: str
     display: "standalone",
     handle_links: "preferred",
     launch_handler: { client_mode: "navigate-existing" },
-    background_color: "#F1F5F9",
+    background_color: "#1E3A8A",
     theme_color: "#1E3A8A",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

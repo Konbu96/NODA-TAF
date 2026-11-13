@@ -94,7 +94,9 @@ export type Meet = {
   updatedAt: string;
 };
 
-export type Entry = { events: string[]; updatedBy: string; updatedAt: string };
+/** 種目ごとの組・レーン（わかっていれば。どちらかだけでもいい） */
+export type HeatLane = { heat?: number; lane?: number };
+export type Entry = { events: string[]; lanes?: Record<string, HeatLane>; updatedBy: string; updatedAt: string };
 
 export type Reflection = {
   memberId: string;

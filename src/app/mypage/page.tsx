@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { DownIcon, NextIcon, PlusIcon } from "@/components/icons";
 import { LineChart } from "@/components/LineChart";
 import { MoodFace, NoMoodFace } from "@/components/MoodFace";
+import { ATHLETE_KINDS, ATHLETE_LABEL, type AthleteKind } from "@/components/Athletes";
+import { EYECATCH_MONTHS, previewEyecatch } from "@/components/PageTransition";
 import { MainShell } from "@/components/Shell";
 import { WarmUpText } from "@/components/WarmUpText";
 import { Card, Chip, Confirm, Label, PrimaryButton, RefMark, Sheet, EditButton, RoleTag } from "@/components/ui";
@@ -131,6 +133,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
       )}
 
       {USE_FIREBASE && <NotifyCard email={me.email} />}
+      {me.isAdmin && <EyecatchCard />}
 
       {askLogout ? (
         <Confirm
@@ -302,6 +305,36 @@ function NotifyCard({ email }: { email: string }) {
           {test && <p className="m-0 text-xs leading-relaxed break-all text-muted">{test}</p>}
         </>
       )}
+    </Card>
+  );
+}
+
+/** 開発者だけ：アイキャッチ（種目 × 月の飾り）を試して見る */
+function EyecatchCard() {
+  // 種目（null はランダム）と月（0 は飾りなし）
+  const [kind, setKind] = useState<AthleteKind | null>(null);
+  const [month, setMonth] = useState(0);
+  const chip = (on: boolean) => `h-9 rounded-[10px] border px-1 text-[13px] ${on ? "border-accent bg-accent text-white" : "border-line bg-white"}`;
+  return (
+    <Card className="flex flex-col gap-3">
+      <Label>アイキャッチを試す</Label>
+      <div className="grid grid-cols-5 gap-1.5">
+        {[null, ...ATHLETE_KINDS].map((k) => (
+          <button key={k ?? "random"} onClick={() => setKind(k)} className={chip(kind === k)}>
+            {k ? ATHLETE_LABEL[k] : "ランダム"}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        {[0, ...EYECATCH_MONTHS].map((m) => (
+          <button key={m} onClick={() => setMonth(m)} className={chip(month === m)}>
+            {m ? `${m}月` : "なし"}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => previewEyecatch(month, kind ?? undefined)} className="h-11 rounded-[10px] bg-accent text-sm font-bold text-white">
+        流してみる
+      </button>
     </Card>
   );
 }
