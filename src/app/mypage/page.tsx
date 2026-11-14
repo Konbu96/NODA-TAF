@@ -8,6 +8,9 @@ import { LineChart } from "@/components/LineChart";
 import { MoodFace, NoMoodFace } from "@/components/MoodFace";
 import { ATHLETE_KINDS, ATHLETE_LABEL, type AthleteKind } from "@/components/Athletes";
 import { EYECATCH_MONTHS, previewEyecatch } from "@/components/PageTransition";
+
+/** アイキャッチの飾りの月 → 季節の名前 */
+const SEASON_LABEL: Record<number, string> = { 4: "春", 8: "夏", 10: "秋", 12: "冬" };
 import { MainShell } from "@/components/Shell";
 import { WarmUpText } from "@/components/WarmUpText";
 import { Card, Chip, Confirm, Label, PrimaryButton, RefMark, Sheet, EditButton, RoleTag } from "@/components/ui";
@@ -328,7 +331,7 @@ function EyecatchCard() {
       <div className="grid grid-cols-5 gap-1.5">
         {[0, ...EYECATCH_MONTHS].map((m) => (
           <button key={m} onClick={() => setMonth(m)} className={chip(month === m)}>
-            {m ? `${m}月` : "なし"}
+            {m ? SEASON_LABEL[m] : "なし"}
           </button>
         ))}
       </div>

@@ -489,20 +489,46 @@ export function deleteMeet(id: string) {
   return done();
 }
 
-export function saveEntry(meetId: string, email: string, events: string[], by: string, lanes: Record<string, HeatLane> = {}) {
-  // 出る種目の分だけ、入っている組・レーンを残す（Firestore は undefined を保存できないので、空のものは入れない）
+/** 出る種目の分だけ、入っている組・レーン・ピットを残す（Firestore は undefined を保存できないので、空のものは入れない） */
+function keepLanes(events: string[], lanes: Record<string, HeatLane>) {
   const kept: Record<string, HeatLane> = {};
   for (const ev of events) {
     const l = lanes[ev];
     const v: HeatLane = {};
-    if (l?.heat) v.heat = l.heat;
-    if (l?.lane) v.lane = l.lane;
-    if (v.heat || v.lane) kept[ev] = v;
+    if (l?.pit) v.pit = l.pit;
+    else {
+      if (l?.heat) v.heat = l.heat;
+      if (l?.lane) v.lane = l.lane;
+    }
+    if (l?.order) v.order = l.order;
+    if (l?.callTime) v.callTime = l.callTime;
+    if (l?.startTime) v.startTime = l.startTime;
+    if (Object.keys(v).length) kept[ev] = v;
   }
+  return kept;
+}
+
+export function saveEntry(meetId: string, email: string, events: string[], by: string, lanes: Record<string, HeatLane> = {}) {
+  const kept = keepLanes(events, lanes);
   update((s) => {
     const list = { ...(s.entries[meetId] ?? {}) };
     if (events.length) list[email] = { events, ...(Object.keys(kept).length ? { lanes: kept } : {}), updatedBy: by, updatedAt: nowIso() };
     else delete list[email];
+    return { ...s, entries: { ...s.entries, [meetId]: list } };
+  });
+  return done();
+}
+
+/** 組・レーンだけを入れ直す（組み分けが出たあとに入力する） */
+export function saveLanes(meetId: string, email: string, lanes: Record<string, HeatLane>, by: string) {
+  update((s) => {
+    const list = { ...(s.entries[meetId] ?? {}) };
+    const e = list[email];
+    if (!e) return s;
+    const kept = keepLanes(e.events, lanes);
+    const rest = { ...e };
+    delete rest.lanes;
+    list[email] = { ...rest, ...(Object.keys(kept).length ? { lanes: kept } : {}), updatedBy: by, updatedAt: nowIso() };
     return { ...s, entries: { ...s.entries, [meetId]: list } };
   });
   return done();

@@ -5,10 +5,10 @@ import { Suspense, useState } from "react";
 import { SubShell } from "@/components/Shell";
 import { Card, Chip, Label, PrimaryButton } from "@/components/ui";
 import { rangeLabel } from "@/lib/dates";
-import { ALL_EVENTS, EVENT_GROUPS, onlyDigits } from "@/lib/marks";
+import { EVENT_GROUPS } from "@/lib/marks";
 import { canEditMenu } from "@/lib/permissions";
 import { saveEntry } from "@/lib/store";
-import type { DbState, HeatLane, Meet, Member } from "@/lib/types";
+import type { DbState, Meet, Member } from "@/lib/types";
 import { familyName } from "@/lib/names";
 
 export default function Page() {
@@ -41,13 +41,6 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
   const router = useRouter();
   const saved = db.entries[meet.id]?.[target.email];
   const [events, setEvents] = useState<string[]>(saved?.events ?? []);
-  // 種目ごとの組・レーン（入力中は文字のまま持つ）
-  const [lanes, setLanes] = useState<Record<string, { heat: string; lane: string }>>(() =>
-    Object.fromEntries(Object.entries(saved?.lanes ?? {}).map(([ev, l]) => [ev, { heat: l.heat ? String(l.heat) : "", lane: l.lane ? String(l.lane) : "" }])),
-  );
-  const setLane = (ev: string, key: "heat" | "lane", v: string) =>
-    setLanes({ ...lanes, [ev]: { ...(lanes[ev] ?? { heat: "", lane: "" }), [key]: onlyDigits(v, 2) } });
-  const chosen = [...events].sort((a, b) => ALL_EVENTS.indexOf(a) - ALL_EVENTS.indexOf(b));
   const toggle = (e: string) => setEvents(events.includes(e) ? events.filter((x) => x !== e) : [...events, e]);
   // 種目は全部、分類ごとに並べる
   const others = EVENT_GROUPS;
@@ -74,38 +67,10 @@ function Form({ db, me, meet, target }: { db: DbState; me: Member; today: string
           </div>
         ))}
       </Card>
-      {chosen.length > 0 && (
-        <Card className="flex flex-col gap-2.5">
-          <Label className="text-[15px] text-ink">組・レーン（わかれば）</Label>
-          {chosen.map((ev) => (
-            <div key={ev} className="flex items-center gap-2">
-              <span className="w-20 shrink-0 text-sm font-bold">{ev}</span>
-              <input
-                inputMode="numeric"
-                value={lanes[ev]?.heat ?? ""}
-                onChange={(e) => setLane(ev, "heat", e.target.value)}
-                aria-label={`${ev} の組`}
-                className="h-10 w-14 rounded-[10px] border border-line px-2 text-center text-base"
-              />
-              <span className="text-sm">組</span>
-              <input
-                inputMode="numeric"
-                value={lanes[ev]?.lane ?? ""}
-                onChange={(e) => setLane(ev, "lane", e.target.value)}
-                aria-label={`${ev} のレーン`}
-                className="ml-2 h-10 w-14 rounded-[10px] border border-line px-2 text-center text-base"
-              />
-              <span className="text-sm">レーン</span>
-            </div>
-          ))}
-        </Card>
-      )}
       <PrimaryButton
         onClick={async () => {
-          const nums: Record<string, HeatLane> = Object.fromEntries(
-            Object.entries(lanes).map(([ev, l]) => [ev, { heat: Number(l.heat) || undefined, lane: Number(l.lane) || undefined }]),
-          );
-          await saveEntry(meet.id, target.email, events, me.email, nums);
+          // 組・レーンはあとから別の画面で入れる。前に入れたものは残す
+          await saveEntry(meet.id, target.email, events, me.email, saved?.lanes ?? {});
           router.push(`/meets/detail?id=${meet.id}`);
         }}
       >

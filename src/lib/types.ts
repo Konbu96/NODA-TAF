@@ -95,7 +95,8 @@ export type Meet = {
 };
 
 /** 種目ごとの組・レーン（わかっていれば。どちらかだけでもいい） */
-export type HeatLane = { heat?: number; lane?: number };
+/** 組・レーン。跳躍はピット（A・B）で分かれる。フィールド競技は試技順もある。時間は "09:30" の形 */
+export type HeatLane = { heat?: number; lane?: number; pit?: string; order?: number; callTime?: string; startTime?: string };
 export type Entry = { events: string[]; lanes?: Record<string, HeatLane>; updatedBy: string; updatedAt: string };
 
 export type Reflection = {

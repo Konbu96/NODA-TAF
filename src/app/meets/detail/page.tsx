@@ -25,7 +25,7 @@ const eventOrder = (e: string) => {
   return i < 0 ? 999 : i;
 };
 
-/** 100m（2組4レーン）、200m … のように、種目と組・レーンを並べる */
+/** 100m（2組4レーン・招集9:30・競技10:00）、200m … のように、種目と組・レーン・時間を並べる */
 const entryText = (e: Entry) =>
   [...e.events]
     .sort((a, b) => eventOrder(a) - eventOrder(b))
@@ -107,6 +107,12 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
               {mine ? "自分のエントリーを直す" : "自分のエントリーを入力"}
             </Link>
           )}
+          {/* 組み分けが出たら、あとから組・レーンを入れる */}
+          {mine && (
+            <Link href={`/meets/lanes?id=${meet.id}`} className="flex h-12 items-center justify-center rounded-xl border-2 border-accent bg-white text-[15px] font-bold text-accent">
+              {mine.lanes ? "自分の組・レーン・時間を直す" : "自分の組・レーン・時間を入力"}
+            </Link>
+          )}
         </Card>
       ) : (
         <Card className="flex flex-col gap-2.5">
@@ -165,14 +171,22 @@ function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: str
   return (
     <Card className="flex flex-col gap-2.5">
       <Label>エントリーを編集（開発者）</Label>
-      {athletes.map((m) => (
-        <Link key={m.email} href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="flex gap-2.5 text-sm">
-          <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
-          <span className={entries[m.email] ? "text-[#334155]" : "text-muted"}>
-            {entries[m.email] ? entryText(entries[m.email]) : "なし"}
-          </span>
-        </Link>
-      ))}
+      {athletes.map((m) => {
+        const q = `id=${meet.id}&member=${encodeURIComponent(m.email)}`;
+        return (
+          <div key={m.email} className="flex items-start gap-2.5 text-sm">
+            <Link href={`/meets/entry?${q}`} className="flex min-w-0 grow gap-2.5">
+              <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
+              <span className={entries[m.email] ? "text-[#334155]" : "text-muted"}>{entries[m.email] ? entryText(entries[m.email]) : "なし"}</span>
+            </Link>
+            {entries[m.email] && (
+              <Link href={`/meets/lanes?${q}`} className="shrink-0 text-xs font-bold text-accent">
+                組・時間
+              </Link>
+            )}
+          </div>
+        );
+      })}
     </Card>
   );
 }
