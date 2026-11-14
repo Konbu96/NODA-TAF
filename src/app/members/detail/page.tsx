@@ -9,7 +9,7 @@ import { monthLabel, nextMonth, shortDate } from "@/lib/dates";
 import { reflectionStatus } from "@/lib/derived";
 import { ALL_EVENTS, windLabel, showMark } from "@/lib/marks";
 import { ROLE_LABEL } from "@/lib/grade";
-import { canEditProfileOf, canEditRecordsOf, canRemove, hasEvents, writesReflection } from "@/lib/permissions";
+import { canEditProfileOf, canRemove, hasEvents, showResultEditOf, writesReflection } from "@/lib/permissions";
 import { removeMember } from "@/lib/store";
 import { legalBestIfRef } from "@/lib/pb";
 import type { DbState, Member } from "@/lib/types";
@@ -69,7 +69,7 @@ function Body({ db, me, today, target }: { db: DbState; me: Member; today: strin
   for (const g of groups) g.list.sort((a, b) => ALL_EVENTS.indexOf(a.event) - ALL_EVENTS.indexOf(b.event));
   const dateLabel = (g: Group) => (g.end !== g.start ? `${shortDate(g.start)}〜${shortDate(g.end)}` : shortDate(g.start));
   const shown = all ? groups : groups.slice(0, 5);
-  const canRecords = canEditRecordsOf(me, target.email);
+  const canRecords = showResultEditOf(me, target.email);
 
   return (
     <>

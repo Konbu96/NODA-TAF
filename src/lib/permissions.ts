@@ -29,6 +29,13 @@ export const canEditProfileOf = (me: Member, targetEmail: string) =>
  *  TODO(一時的): 前のアプリの記録を移すあいだは、顧問・開発者もほかの人の分を直せる */
 export const canEditRecordsOf = (me: Member, targetEmail: string) => me.email === targetEmail || me.role === "manager" || isAdviser(me);
 
+/** 開発者の権限だけで出ている「ほかの人の結果を直す」ボタンを隠す。TODO: コンテストが終わったら false に戻す */
+const HIDE_DEV_RESULT_EDIT = true;
+
+/** ほかの人の結果の編集ボタンを出すか（開発者の権限だけのときは、いまは隠す） */
+export const showResultEditOf = (me: Member, targetEmail: string) =>
+  canEditRecordsOf(me, targetEmail) && !(HIDE_DEV_RESULT_EDIT && me.email !== targetEmail && me.role !== "manager" && me.role !== "adviser");
+
 export const hasAdminMenu = (m: Member) => canEditMenu(m) || canEditFees(m);
 
 /** 自分の記録や気分を持つ人（顧問は持たない） */

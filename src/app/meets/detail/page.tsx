@@ -9,7 +9,7 @@ import { rangeLabel } from "@/lib/dates";
 import { isMeetOver, missingRecords } from "@/lib/derived";
 import { sortMembers } from "@/lib/grade";
 import { ALL_EVENTS, heatLaneLabel, windLabel, showMark } from "@/lib/marks";
-import { canEditMenu, canEditRecordsOf, hasEvents, isAthlete } from "@/lib/permissions";
+import { canEditMenu, hasEvents, isAthlete, showResultEditOf } from "@/lib/permissions";
 import type { DbState, Entry, Meet, Member } from "@/lib/types";
 
 export default function Page() {
@@ -138,7 +138,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
                 <p className="mt-0 mb-1 flex items-center gap-2 text-[13px] font-bold">
                   <span className="grow">{m.email === me.email ? "あなた" : m.name}</span>
                   {/* マネージャーは、ほかの人の記録も直せる */}
-                  {canEditRecordsOf(me, m.email) && m.email !== me.email && (
+                  {showResultEditOf(me, m.email) && m.email !== me.email && (
                     <EditButton small href={`/records/edit?meet=${meet.id}&member=${encodeURIComponent(m.email)}`} ariaLabel={`${m.name}の記録を編集`} />
                   )}
                 </p>

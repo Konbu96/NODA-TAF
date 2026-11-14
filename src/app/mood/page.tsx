@@ -6,13 +6,16 @@ import { MoodFace, MOODS } from "@/components/MoodFace";
 import { PlainHeader, useGate } from "@/components/Shell";
 import { dayLabel } from "@/lib/dates";
 import { setMood } from "@/lib/store";
+import { markMoodAsked, moodAskPending } from "@/lib/moodAsk";
 import type { MoodKind } from "@/lib/types";
 
 export default function MoodPage() {
   const gate = useGate(false);
   const router = useRouter();
   const [picked, setPicked] = useState<MoodKind | null>(null);
-  const already = gate ? !!gate.db.moods[`${gate.today}_${gate.me.email}`] : false;
+  // いまだけ：アプリを開くたびに聞く（その日 2 回目からは、選んでも 1 回目の気分のまま）
+  const [askAgain] = useState(moodAskPending);
+  const already = gate ? !!gate.db.moods[`${gate.today}_${gate.me.email}`] && !askAgain : false;
 
   useEffect(() => {
     if (already && !picked) router.replace("/");
@@ -23,6 +26,7 @@ export default function MoodPage() {
   const pick = (kind: MoodKind) => {
     if (picked) return;
     setPicked(kind);
+    markMoodAsked();
     setTimeout(async () => {
       await setMood(gate.me.email, kind);
       router.replace("/");

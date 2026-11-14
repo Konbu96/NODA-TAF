@@ -8,6 +8,7 @@ import { isAthlete } from "@/lib/permissions";
 import type { DbState, Member } from "@/lib/types";
 import { USE_FIREBASE } from "@/lib/firebase";
 import { useApp } from "@/lib/useApp";
+import { moodAskPending } from "@/lib/moodAsk";
 import { BackIcon, HomeCloseIcon, ListIcon, PeopleIcon, PersonIcon, TrophyIcon } from "./icons";
 import { Badge } from "./ui";
 
@@ -15,7 +16,7 @@ import { Badge } from "./ui";
 export function useGate(askMood = true) {
   const { db, me, email, today, ready } = useApp();
   const router = useRouter();
-  const needMood = !!(db && me && isAthlete(me) && !db.moods[`${today}_${me.email}`]);
+  const needMood = !!(db && me && isAthlete(me) && (!db.moods[`${today}_${me.email}`] || moodAskPending()));
   let to: string | null = null;
   if (ready) {
     if (!email) to = "/login";
