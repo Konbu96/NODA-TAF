@@ -146,14 +146,12 @@ export const FIELD_EVENTS = EVENT_GROUPS.filter((g) => g.name === "跳躍" || g.
 /** 組もピットもなく、試技順だけの種目（投てき） */
 export const ORDER_ONLY_EVENTS = EVENT_GROUPS.find((g) => g.name === "投てき")!.events;
 
-/** 組・レーンの文字（2組4レーン、Aピット・試技順5、1組・試技順3）。なにもなければ空 */
-export function heatLaneLabel(l?: { heat?: number; lane?: number; pit?: string; order?: number; callTime?: string; startTime?: string }): string {
-  if (!l) return "";
-  const place = l.pit ? `${l.pit}ピット` : `${l.heat ? `${l.heat}組` : ""}${l.lane ? `${l.lane}レーン` : ""}`;
-  const order = l.order ? `試技順${l.order}` : "";
-  const call = l.callTime ? `招集${timeLabel(l.callTime)}` : "";
-  const start = l.startTime ? `競技${timeLabel(l.startTime)}` : "";
-  return [place, order, call, start].filter(Boolean).join("・");
+/** 表示用に分けたもの。場所（2組 4レーン／Aピット）と試技順と時間 */
+export function heatLaneParts(l?: { heat?: number; lane?: number; pit?: string; order?: number; callTime?: string; startTime?: string }) {
+  if (!l) return { place: [] as string[], call: "", start: "" };
+  const place = l.pit ? [`${l.pit}ピット`] : [l.heat ? `${l.heat}組` : "", l.lane ? `${l.lane}レーン` : ""].filter(Boolean);
+  if (l.order) place.push(`試技順 ${l.order}`);
+  return { place, call: l.callTime ? timeLabel(l.callTime) : "", start: l.startTime ? timeLabel(l.startTime) : "" };
 }
 
 /** "09:30" → "9:30" */

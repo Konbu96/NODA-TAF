@@ -8,7 +8,7 @@ import { Card, Label, PbTag, PrimaryLink, RefMark, EditButton } from "@/componen
 import { rangeLabel } from "@/lib/dates";
 import { isMeetOver, missingRecords } from "@/lib/derived";
 import { sortMembers } from "@/lib/grade";
-import { ALL_EVENTS, heatLaneLabel, windLabel, showMark } from "@/lib/marks";
+import { ALL_EVENTS, heatLaneParts, windLabel, showMark } from "@/lib/marks";
 import { canEditMenu, hasEvents, isAthlete, showResultEditOf } from "@/lib/permissions";
 import type { DbState, Entry, Meet, Member } from "@/lib/types";
 
@@ -25,24 +25,47 @@ const eventOrder = (e: string) => {
   return i < 0 ? 999 : i;
 };
 
-/** 100m（2組4レーン・招集9:30・競技10:00）のように、種目と組・レーン・時間を 1 種目ずつ */
-const entryLines = (e: Entry) =>
-  [...e.events]
-    .sort((a, b) => eventOrder(a) - eventOrder(b))
-    .map((ev) => {
-      const l = heatLaneLabel(e.lanes?.[ev]);
-      return l ? `${ev}（${l}）` : ev;
-    });
+const sortedEvents = (e: Entry) => [...e.events].sort((a, b) => eventOrder(a) - eventOrder(b));
 
-const entryText = (e: Entry) => entryLines(e).join("、");
+/** 見出しの「あなた：」には種目名だけ */
+const entryText = (e: Entry) => sortedEvents(e).join("、");
 
-/** 名前の右に、種目を 1 行ずつ縦に並べる */
+/** 名前の右に、種目を 1 つずつ。組・レーンと時間は下に分けて、ラベルを付ける */
 function EntryLines({ entry }: { entry: Entry }) {
   return (
-    <span className="flex min-w-0 flex-col text-[#334155]">
-      {entryLines(entry).map((l) => (
-        <span key={l}>{l}</span>
-      ))}
+    <div className="flex min-w-0 grow flex-col gap-4 text-[#334155]">
+      {sortedEvents(entry).map((ev) => {
+        const { place, call, start } = heatLaneParts(entry.lanes?.[ev]);
+        return (
+          <div key={ev} className="flex flex-col gap-1.5">
+            <span className="font-bold">{ev}</span>
+            {place.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {place.map((p) => (
+                  <span key={p} className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-[#334155]">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            )}
+            {(call || start) && (
+              <div className="flex flex-col gap-1 text-xs">
+                {call && <TimeItem label="招集" time={call} />}
+                {start && <TimeItem label="競技開始" time={start} />}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TimeItem({ label, time }: { label: string; time: string }) {
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span className="w-14 text-muted">{label}</span>
+      <span className="text-sm font-bold tabular-nums text-[#0f172a]">{time}</span>
     </span>
   );
 }
@@ -101,7 +124,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
           </div>
           {entrants.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
           {entrants.map((m, i) => (
-            <div key={m.email} className={`flex gap-2.5 text-sm ${i ? "border-t border-divider pt-2.5" : ""}`}>
+            <div key={m.email} className={`flex gap-3 text-sm ${i ? "border-t border-divider pt-4" : ""}`}>
               <span className="w-24 shrink-0 font-bold">
                 {editor ? (
                   <Link href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="underline decoration-line">
@@ -186,8 +209,8 @@ function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: str
       {athletes.map((m, i) => {
         const q = `id=${meet.id}&member=${encodeURIComponent(m.email)}`;
         return (
-          <div key={m.email} className={`flex items-start gap-2.5 text-sm ${i ? "border-t border-divider pt-2.5" : ""}`}>
-            <Link href={`/meets/entry?${q}`} className="flex min-w-0 grow gap-2.5">
+          <div key={m.email} className={`flex items-start gap-3 text-sm ${i ? "border-t border-divider pt-4" : ""}`}>
+            <Link href={`/meets/entry?${q}`} className="flex min-w-0 grow gap-3">
               <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
               {entries[m.email] ? <EntryLines entry={entries[m.email]} /> : <span className="text-muted">なし</span>}
             </Link>
