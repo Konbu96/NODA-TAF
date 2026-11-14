@@ -25,15 +25,27 @@ const eventOrder = (e: string) => {
   return i < 0 ? 999 : i;
 };
 
-/** 100m（2組4レーン・招集9:30・競技10:00）、200m … のように、種目と組・レーン・時間を並べる */
-const entryText = (e: Entry) =>
+/** 100m（2組4レーン・招集9:30・競技10:00）のように、種目と組・レーン・時間を 1 種目ずつ */
+const entryLines = (e: Entry) =>
   [...e.events]
     .sort((a, b) => eventOrder(a) - eventOrder(b))
     .map((ev) => {
       const l = heatLaneLabel(e.lanes?.[ev]);
       return l ? `${ev}（${l}）` : ev;
-    })
-    .join("、");
+    });
+
+const entryText = (e: Entry) => entryLines(e).join("、");
+
+/** 名前の右に、種目を 1 行ずつ縦に並べる */
+function EntryLines({ entry }: { entry: Entry }) {
+  return (
+    <span className="flex min-w-0 flex-col text-[#334155]">
+      {entryLines(entry).map((l) => (
+        <span key={l}>{l}</span>
+      ))}
+    </span>
+  );
+}
 
 function Inner() {
   const id = useSearchParams().get("id") ?? "";
@@ -88,8 +100,8 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
             {mine && <p className="m-0 text-xs font-bold text-ok">あなた：{entryText(mine)}</p>}
           </div>
           {entrants.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
-          {entrants.map((m) => (
-            <div key={m.email} className="flex gap-2.5 text-sm">
+          {entrants.map((m, i) => (
+            <div key={m.email} className={`flex gap-2.5 text-sm ${i ? "border-t border-divider pt-2.5" : ""}`}>
               <span className="w-24 shrink-0 font-bold">
                 {editor ? (
                   <Link href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="underline decoration-line">
@@ -99,7 +111,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
                   m.name
                 )}
               </span>
-              <span className="text-[#334155]">{entryText(entries[m.email])}</span>
+              <EntryLines entry={entries[m.email]} />
             </div>
           ))}
           {isAthlete(me) && me.role !== "manager" && (
@@ -171,13 +183,13 @@ function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: str
   return (
     <Card className="flex flex-col gap-2.5">
       <Label>エントリーを編集（開発者）</Label>
-      {athletes.map((m) => {
+      {athletes.map((m, i) => {
         const q = `id=${meet.id}&member=${encodeURIComponent(m.email)}`;
         return (
-          <div key={m.email} className="flex items-start gap-2.5 text-sm">
+          <div key={m.email} className={`flex items-start gap-2.5 text-sm ${i ? "border-t border-divider pt-2.5" : ""}`}>
             <Link href={`/meets/entry?${q}`} className="flex min-w-0 grow gap-2.5">
               <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
-              <span className={entries[m.email] ? "text-[#334155]" : "text-muted"}>{entries[m.email] ? entryText(entries[m.email]) : "なし"}</span>
+              {entries[m.email] ? <EntryLines entry={entries[m.email]} /> : <span className="text-muted">なし</span>}
             </Link>
             {entries[m.email] && (
               <Link href={`/meets/lanes?${q}`} className="shrink-0 text-xs font-bold text-accent">

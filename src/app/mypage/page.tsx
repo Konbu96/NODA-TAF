@@ -20,7 +20,7 @@ import { legalBestIfRef, pbEvents } from "@/lib/pb";
 import { gradeOf, ROLE_LABEL } from "@/lib/grade";
 import { formatValue, lowerIsBetter, showMark } from "@/lib/marks";
 import { isAthlete, writesReflection } from "@/lib/permissions";
-import { addWarmUp, logout, saveWarmUpDetail } from "@/lib/store";
+import { addTempData, addWarmUp, clearTempData, logout, saveWarmUpDetail, TEMP_PREFIX } from "@/lib/store";
 import { USE_FIREBASE } from "@/lib/firebase";
 import { disablePush, enablePush, pushState, sendTest, type PushState } from "@/lib/push";
 import type { DbState, Member } from "@/lib/types";
@@ -64,9 +64,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
           </p>
           <p className="mt-0.5 mb-0 text-[13px] text-sub">{[grade, runner && me.bibNumber && `ゼッケン ${me.bibNumber}`].filter(Boolean).join("・")}</p>
         </div>
-        {runner && (
-          <EditButton href="/profile/edit" ariaLabel="プロフィールを編集" />
-        )}
+        {runner && <EditButton href="/profile/edit" ariaLabel="プロフィールを編集" />}
       </Card>
 
       {writesReflection(me) && (
@@ -137,6 +135,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
 
       {USE_FIREBASE && <NotifyCard email={me.email} />}
       {me.isAdmin && <EyecatchCard />}
+      {me.isAdmin && <TempDataCard db={db} email={me.email} />}
 
       {askLogout ? (
         <Confirm
@@ -219,7 +218,12 @@ function WarmUpDetails({ db, today }: { db: DbState; today: string }) {
         {edit?.isNew && (
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-bold text-sub">名前</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例：ハードルドリル" className="h-11 rounded-[10px] border border-line px-3 text-[15px]" />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例：ハードルドリル"
+              className="h-11 rounded-[10px] border border-line px-3 text-[15px]"
+            />
             {taken && <span className="text-xs text-danger">同じ名前のものがもうあります</span>}
           </label>
         )}
@@ -233,7 +237,9 @@ function WarmUpDetails({ db, today }: { db: DbState; today: string }) {
             placeholder={"1. もも上げ 20m\n2. スキップ 20m\n・ゆっくり20 速く20"}
             className="rounded-[10px] border border-line px-3 py-2.5 text-[15px] leading-[1.6]"
           />
-          {!edit?.isNew && !text.trim() && <span className="text-xs text-warn-dark">空にして保存すると、練習メモから消えます（メニューの選択肢には残ります）</span>}
+          {!edit?.isNew && !text.trim() && (
+            <span className="text-xs text-warn-dark">空にして保存すると、練習メモから消えます（メニューの選択肢には残ります）</span>
+          )}
         </label>
         <PrimaryButton onClick={save} disabled={edit?.isNew ? !newName || !text.trim() || taken : false}>
           保存する
@@ -317,10 +323,15 @@ function EyecatchCard() {
   // 種目（null はランダム）と月（0 は飾りなし）
   const [kind, setKind] = useState<AthleteKind | null>(null);
   const [month, setMonth] = useState(0);
-  const chip = (on: boolean) => `h-9 rounded-[10px] border px-1 text-[13px] ${on ? "border-accent bg-accent text-white" : "border-line bg-white"}`;
+  // 開発者用だとわかるように、灰色・等幅の文字にする
+  const chip = (on: boolean) =>
+    `h-9 rounded-md border px-1 font-mono text-[12px] ${on ? "border-slate-600 bg-slate-600 text-white" : "border-slate-300 bg-white text-slate-600"}`;
   return (
-    <Card className="flex flex-col gap-3">
-      <Label>アイキャッチを試す</Label>
+    <section className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-400 bg-slate-200 p-4 text-slate-700">
+      <div className="flex items-center gap-2">
+        <span className="rounded bg-slate-600 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white">DEV</span>
+        <p className="m-0 font-mono text-[13px] font-bold">開発者モード：アイキャッチを試す</p>
+      </div>
       <div className="grid grid-cols-5 gap-1.5">
         {[null, ...ATHLETE_KINDS].map((k) => (
           <button key={k ?? "random"} onClick={() => setKind(k)} className={chip(kind === k)}>
@@ -335,9 +346,64 @@ function EyecatchCard() {
           </button>
         ))}
       </div>
-      <button onClick={() => previewEyecatch(month, kind ?? undefined)} className="h-11 rounded-[10px] bg-accent text-sm font-bold text-white">
-        流してみる
+      <button
+        onClick={() => previewEyecatch(month, kind ?? undefined)}
+        className="h-10 rounded-md border border-slate-500 bg-white font-mono text-sm font-bold text-slate-700"
+      >
+        ▶ 流してみる
       </button>
-    </Card>
+    </section>
+  );
+}
+
+/** 開発者だけ：画面を確かめるための仮の記録を入れる・消す（TODO: 本物の記録がそろったら消す） */
+function TempDataCard({ db, email }: { db: DbState; email: string }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [ask, setAsk] = useState(false);
+  const count =
+    Object.keys(db.records).filter((id) => id.startsWith(TEMP_PREFIX)).length + Object.keys(db.stabro).filter((id) => id.startsWith(TEMP_PREFIX)).length;
+  const btn = "h-10 rounded-md border border-slate-500 bg-white font-mono text-sm font-bold text-slate-700 disabled:opacity-50";
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-400 bg-slate-200 p-4 text-slate-700">
+      <div className="flex items-center gap-2">
+        <span className="rounded bg-slate-600 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white">DEV</span>
+        <p className="m-0 font-mono text-[13px] font-bold">開発者モード：仮の記録</p>
+      </div>
+      <p className="m-0 font-mono text-[12px] leading-relaxed">スタブロ（開発ボット・岡本一）と、岡本一の 400m・400mH（新人大会）。いま {count} 件</p>
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          disabled={busy || count > 0}
+          className={btn}
+          onClick={async () => {
+            setBusy(true);
+            const missing = await addTempData(email);
+            setBusy(false);
+            setMsg(missing.length ? `見つからなかった：${missing.join("、")}` : "入れました");
+          }}
+        >
+          ＋ 入れる
+        </button>
+        <button disabled={busy || count === 0} className={btn} onClick={() => setAsk(true)}>
+          − 消す
+        </button>
+      </div>
+      {msg && <p className="m-0 font-mono text-[12px]">{msg}</p>}
+      {ask && (
+        <Confirm
+          danger
+          title="仮の記録を全部消しますか？"
+          okLabel="消す"
+          onCancel={() => setAsk(false)}
+          onOk={async () => {
+            setAsk(false);
+            setBusy(true);
+            await clearTempData();
+            setBusy(false);
+            setMsg("消しました");
+          }}
+        />
+      )}
+    </section>
   );
 }

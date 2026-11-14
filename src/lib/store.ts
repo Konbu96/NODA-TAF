@@ -534,6 +534,112 @@ export function saveLanes(meetId: string, email: string, lanes: Record<string, H
   return done();
 }
 
+// ---------- 仮データ（開発者用・あとで消す） ----------
+// 画面の見た目を確かめるための仮の記録。id を "tmp_" で始めて、あとでまとめて消せるようにする。
+// TODO: 本物の記録がそろったら、この仮データの機能ごと消す
+
+export const TEMP_PREFIX = "tmp_";
+const TEMP_STABRO_PEOPLE = ["開発ボット", "岡本一"];
+const TEMP_STABRO_DATES = ["2026-10-17", "2026-10-24", "2026-10-31", "2026-11-07"];
+const TEMP_RECORD_PERSON = "岡本一";
+const TEMP_RECORD_MEET = "山口県高等学校新人陸上競技大会";
+/** 同じ大会で 2 本（予選・決勝のような形）。2 本目は大会の最後の日にする */
+const TEMP_RECORDS: { event: string; digits: string[] }[] = [
+  { event: "400m", digits: ["10318", "10209"] },
+  { event: "400mH", digits: ["10665", "10832"] },
+];
+
+/** 部員の PB とスタブロのベストを、今の記録から計算し直す */
+function recomputeMemberBests(s: DbState, email: string): DbState {
+  const m = s.members[email];
+  if (!m) return s;
+  const sb: Partial<Record<StabroDistance, number>> = {};
+  for (const x of Object.values(s.stabro).filter((x) => x.memberId === email))
+    for (const [d, v] of Object.entries(x.bests)) {
+      const k = d as StabroDistance;
+      if (v != null && (sb[k] == null || v < (sb[k] as number))) sb[k] = v;
+    }
+  return { ...s, members: { ...s.members, [email]: { ...m, stabroBests: sb, personalBests: recomputeAllPBs(s, m) } } };
+}
+
+/** 仮データを入れる。見つからなかった人・大会の名前を返す */
+export function addTempData(by: string): Promise<string[]> {
+  const missing: string[] = [];
+  update((s0) => {
+    let s = s0;
+    const byName = (name: string) => Object.values(s.members).find((m) => m.name.replace(/\s/g, "") === name);
+    const stabro = { ...s.stabro };
+    const records = { ...s.records };
+    const touched = new Set<string>();
+    // スタブロ：30m・60m・80m を 4 回ずつ（4.30〜4.99 秒）
+    for (const name of TEMP_STABRO_PEOPLE) {
+      const m = byName(name);
+      if (!m) {
+        missing.push(name);
+        continue;
+      }
+      touched.add(m.email);
+      TEMP_STABRO_DATES.forEach((date) => {
+        const id = `${TEMP_PREFIX}s_${m.email}_${date}`;
+        const runs: Partial<Record<StabroDistance, number[]>> = {};
+        const bests: Partial<Record<StabroDistance, number>> = {};
+        for (const d of ["30m", "60m", "80m"] as StabroDistance[]) {
+          const v = Math.round((4.3 + Math.random() * 0.69) * 100) / 100;
+          runs[d] = [v];
+          bests[d] = v;
+        }
+        stabro[id] = { id, memberId: m.email, date, runs, bests, enteredBy: by, updatedAt: nowIso() };
+      });
+    }
+    // 大会の記録
+    const person = byName(TEMP_RECORD_PERSON);
+    const meet = Object.values(s.meets).find((x) => x.name.replace(/\s/g, "") === TEMP_RECORD_MEET);
+    if (!person) missing.push(TEMP_RECORD_PERSON);
+    if (!meet) missing.push(TEMP_RECORD_MEET);
+    if (person && meet) {
+      touched.add(person.email);
+      for (const { event, digits } of TEMP_RECORDS) {
+        digits.forEach((d, i) => {
+          const parsed = parseMark(event, d);
+          if (!parsed) return;
+          const id = `${TEMP_PREFIX}r_${person.email}_${meet.id}_${event}_${i}`;
+          records[id] = {
+            id, memberId: person.email, date: i === 0 ? meet.startDate : meet.endDate, meetId: meet.id, meetName: meet.name, event,
+            mark: parsed.mark, value: parsed.value, wind: null, isWindAssisted: false, isPB: false, updatedBy: by, updatedAt: nowIso(),
+          };
+        });
+      }
+      // PB の印：日付順に見て、それまでよりよければ PB
+      for (const { event } of TEMP_RECORDS) {
+        const list = Object.values(records).filter((r) => r.memberId === person.email && r.event === event && !r.isShort).sort((a, b) => a.date.localeCompare(b.date));
+        let best: number | null = null;
+        for (const r of list) {
+          const pb = best == null || isBetter(event, r.value, best);
+          if (r.id.startsWith(TEMP_PREFIX)) records[r.id] = { ...r, isPB: pb };
+          if (pb) best = r.value;
+        }
+      }
+    }
+    s = { ...s, stabro, records };
+    for (const email of touched) s = recomputeMemberBests(s, email);
+    return s;
+  });
+  return lastWrite.then(() => missing);
+}
+
+/** 仮データ（id が tmp_ で始まるもの）を全部消して、PB を計算し直す */
+export function clearTempData() {
+  update((s0) => {
+    const touched = new Set<string>();
+    const stabro = Object.fromEntries(Object.entries(s0.stabro).filter(([id, x]) => (id.startsWith(TEMP_PREFIX) ? (touched.add(x.memberId), false) : true)));
+    const records = Object.fromEntries(Object.entries(s0.records).filter(([id, r]) => (id.startsWith(TEMP_PREFIX) ? (touched.add(r.memberId), false) : true)));
+    let s = { ...s0, stabro, records };
+    for (const email of touched) s = recomputeMemberBests(s, email);
+    return s;
+  });
+  return done();
+}
+
 // ---------- 振り返り・気分・スタブロ ----------
 
 export function submitReflection(email: string, month: string, lastGoal: string, achievement: number | null, review: string, goal: string) {
