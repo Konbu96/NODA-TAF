@@ -25,6 +25,11 @@ export function isMeetOver(meet: Meet, today: string): boolean {
   return diffDays(today, meet.endDate || meet.startDate) > 0;
 }
 
+/** 大会の初日をむかえた（当日から結果を入れられる） */
+export function isMeetStarted(meet: Meet, today: string): boolean {
+  return diffDays(today, meet.startDate) >= 0;
+}
+
 /** 終わった大会で、エントリーしたのに記録を入れていない種目 */
 export function missingRecords(db: DbState, meet: Meet, email: string, today: string): string[] {
   if (!isMeetOver(meet, today)) return [];

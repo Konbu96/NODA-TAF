@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { SubShell } from "@/components/Shell";
 import { Card, Label, PbTag, PrimaryLink, RefMark, EditButton } from "@/components/ui";
 import { rangeLabel } from "@/lib/dates";
-import { isMeetOver, missingRecords } from "@/lib/derived";
+import { isMeetOver, isMeetStarted, missingRecords } from "@/lib/derived";
 import { sortMembers } from "@/lib/grade";
 import { ALL_EVENTS, heatLaneParts, windLabel, showMark } from "@/lib/marks";
 import { canEditMenu, hasEvents, isAthlete, showResultEditOf } from "@/lib/permissions";
@@ -85,6 +85,8 @@ function Inner() {
 
 function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string; meet: Meet }) {
   const over = isMeetOver(meet, today);
+  // 大会当日は、エントリー（組・時間）と結果の両方を出す
+  const started = isMeetStarted(meet, today);
   const entries = db.entries[meet.id] ?? {};
   const records = Object.values(db.records).filter((r) => r.meetId === meet.id);
   // 人ごとに並べる（エントリーした人と、記録がある人）
@@ -116,7 +118,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
         )}
       </Card>
 
-      {!over ? (
+      {!over && (
         <Card className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between">
             <Label>エントリー（{Object.keys(entries).length}人）</Label>
@@ -149,7 +151,9 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
             </Link>
           )}
         </Card>
-      ) : (
+      )}
+
+      {started && (
         <Card className="flex flex-col gap-2.5">
           <Label>結果</Label>
           {people.length === 0 && <p className="m-0 text-sm text-muted">記録はまだありません</p>}
@@ -186,7 +190,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
               </div>
             );
           })}
-          {mine && <PrimaryLink href={`/records/edit?meet=${meet.id}`}>{missing.length ? "自分の記録を入力する" : "自分の記録を直す"}</PrimaryLink>}
+          {mine && <PrimaryLink href={`/records/edit?meet=${meet.id}`}>{missing.length || !records.some((r) => r.memberId === me.email) ? "自分の記録を入力する" : "自分の記録を直す"}</PrimaryLink>}
         </Card>
       )}
 
@@ -206,6 +210,9 @@ function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: str
   return (
     <Card className="flex flex-col gap-2.5">
       <Label>エントリーを編集（開発者）</Label>
+      <Link href={`/meets/bulk?id=${meet.id}`} className="flex h-12 items-center justify-center rounded-xl bg-accent text-[15px] font-bold text-white">
+        種目ごとにまとめて編集
+      </Link>
       {athletes.map((m, i) => {
         const q = `id=${meet.id}&member=${encodeURIComponent(m.email)}`;
         return (

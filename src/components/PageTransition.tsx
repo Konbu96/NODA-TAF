@@ -22,20 +22,14 @@ type Stage = "in" | "hold" | "out" | null;
 
 const randomKind = () => ATHLETE_KINDS[Math.floor(Math.random() * ATHLETE_KINDS.length)];
 
-const PREVIEW_EVENT = "eyecatch-preview";
 /** アイキャッチ 1 回分の長さ（ミリ秒） */
 export const EYECATCH_MS = POP * 2 + RUN; // やり投げは runTime の分だけ長い
-/** アイキャッチを試しに流す（画面は切りかえない）。月 0 は飾りなし。種目を決めなければランダム */
-export function previewEyecatch(month: number, kind?: AthleteKind) {
-  window.dispatchEvent(new CustomEvent(PREVIEW_EVENT, { detail: { month, kind } }));
-}
 
 export function PageTransition() {
   const pathname = usePathname();
   const router = useRouter();
   const [stage, setStage] = useState<Stage>(null);
   const [key, setKey] = useState(0);
-  const [month, setMonth] = useState<number | null>(null); // 試しに見るときの月（ふだんは今の月）
   const [kind, setKindState] = useState<AthleteKind>("run"); // 出す種目（毎回ランダム）
   const kindRef = useRef<AthleteKind>("run"); // タイマーの中から今の種目を見る
   const setKind = (k: AthleteKind) => {
@@ -81,7 +75,6 @@ export function PageTransition() {
       e.preventDefault();
       clear();
       setKey((k) => k + 1);
-      setMonth(null);
       setKind(randomKind());
       setStage("in");
       waiting.current = true;
@@ -115,27 +108,11 @@ export function PageTransition() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // マイページの「アイキャッチを試す」：画面は切りかえずに、その月の動きだけ見せる
-  useEffect(() => {
-    const onPreview = (e: Event) => {
-      clear();
-      const d = (e as CustomEvent<{ month: number; kind?: AthleteKind }>).detail;
-      setMonth(d.month);
-      setKind(d.kind ?? randomKind());
-      setKey((k) => k + 1);
-      setStage("in");
-      later(POP, runThenFinish);
-    };
-    window.addEventListener(PREVIEW_EVENT, onPreview);
-    return () => window.removeEventListener(PREVIEW_EVENT, onPreview);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => clear, []);
 
   if (!stage) return null;
   const anim = stage === "in" ? "pop-in" : stage === "out" ? "pop-out" : "pop-hold";
-  const m = month ?? currentMonth();
+  const m = seasonMonth(currentMonth());
   return (
     // 押すと飛ばせる（切りかえ待ちなら、すぐ切りかえる）
     <div
@@ -171,8 +148,13 @@ const rnd = (i: number, salt: number) => {
 };
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
-/** 飾りのある月（マイページの「アイキャッチを試す」でも使う） */
-export const EYECATCH_MONTHS = [4, 8, 10, 12];
+/** 季節ごとの飾り。春（3〜5月）は 4 月、夏（6〜8月）は 8 月、秋（9〜11月）は 10 月、冬（12〜2月）は 12 月の飾りを出す */
+function seasonMonth(month: number): number {
+  if (month >= 3 && month <= 5) return 4;
+  if (month >= 6 && month <= 8) return 8;
+  if (month >= 9 && month <= 11) return 10;
+  return 12;
+}
 
 /** 今の月（開発中だけ、アドレスに ?month=4 を付けるとその月で試せる） */
 function currentMonth(): number {

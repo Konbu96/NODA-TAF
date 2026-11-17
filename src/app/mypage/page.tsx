@@ -6,11 +6,7 @@ import { useEffect, useState } from "react";
 import { DownIcon, NextIcon, PlusIcon } from "@/components/icons";
 import { LineChart } from "@/components/LineChart";
 import { MoodFace, NoMoodFace } from "@/components/MoodFace";
-import { ATHLETE_KINDS, ATHLETE_LABEL, type AthleteKind } from "@/components/Athletes";
-import { EYECATCH_MONTHS, previewEyecatch } from "@/components/PageTransition";
 
-/** アイキャッチの飾りの月 → 季節の名前 */
-const SEASON_LABEL: Record<number, string> = { 4: "春", 8: "夏", 10: "秋", 12: "冬" };
 import { MainShell } from "@/components/Shell";
 import { WarmUpText } from "@/components/WarmUpText";
 import { Card, Chip, Confirm, Label, PrimaryButton, RefMark, Sheet, EditButton, RoleTag } from "@/components/ui";
@@ -20,7 +16,7 @@ import { legalBestIfRef, pbEvents } from "@/lib/pb";
 import { gradeOf, ROLE_LABEL } from "@/lib/grade";
 import { formatValue, lowerIsBetter, showMark } from "@/lib/marks";
 import { isAthlete, writesReflection } from "@/lib/permissions";
-import { addTempData, addWarmUp, clearTempData, logout, saveWarmUpDetail, TEMP_PREFIX } from "@/lib/store";
+import { addWarmUp, logout, saveWarmUpDetail } from "@/lib/store";
 import { USE_FIREBASE } from "@/lib/firebase";
 import { disablePush, enablePush, pushState, sendTest, type PushState } from "@/lib/push";
 import type { DbState, Member } from "@/lib/types";
@@ -134,8 +130,6 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
       )}
 
       {USE_FIREBASE && <NotifyCard email={me.email} />}
-      {me.isAdmin && <EyecatchCard />}
-      {me.isAdmin && <TempDataCard db={db} email={me.email} />}
 
       {askLogout ? (
         <Confirm
@@ -315,95 +309,5 @@ function NotifyCard({ email }: { email: string }) {
         </>
       )}
     </Card>
-  );
-}
-
-/** 開発者だけ：アイキャッチ（種目 × 月の飾り）を試して見る */
-function EyecatchCard() {
-  // 種目（null はランダム）と月（0 は飾りなし）
-  const [kind, setKind] = useState<AthleteKind | null>(null);
-  const [month, setMonth] = useState(0);
-  // 開発者用だとわかるように、灰色・等幅の文字にする
-  const chip = (on: boolean) =>
-    `h-9 rounded-md border px-1 font-mono text-[12px] ${on ? "border-slate-600 bg-slate-600 text-white" : "border-slate-300 bg-white text-slate-600"}`;
-  return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-400 bg-slate-200 p-4 text-slate-700">
-      <div className="flex items-center gap-2">
-        <span className="rounded bg-slate-600 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white">DEV</span>
-        <p className="m-0 font-mono text-[13px] font-bold">開発者モード：アイキャッチを試す</p>
-      </div>
-      <div className="grid grid-cols-5 gap-1.5">
-        {[null, ...ATHLETE_KINDS].map((k) => (
-          <button key={k ?? "random"} onClick={() => setKind(k)} className={chip(kind === k)}>
-            {k ? ATHLETE_LABEL[k] : "ランダム"}
-          </button>
-        ))}
-      </div>
-      <div className="grid grid-cols-5 gap-1.5">
-        {[0, ...EYECATCH_MONTHS].map((m) => (
-          <button key={m} onClick={() => setMonth(m)} className={chip(month === m)}>
-            {m ? SEASON_LABEL[m] : "なし"}
-          </button>
-        ))}
-      </div>
-      <button
-        onClick={() => previewEyecatch(month, kind ?? undefined)}
-        className="h-10 rounded-md border border-slate-500 bg-white font-mono text-sm font-bold text-slate-700"
-      >
-        ▶ 流してみる
-      </button>
-    </section>
-  );
-}
-
-/** 開発者だけ：画面を確かめるための仮の記録を入れる・消す（TODO: 本物の記録がそろったら消す） */
-function TempDataCard({ db, email }: { db: DbState; email: string }) {
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [ask, setAsk] = useState(false);
-  const count =
-    Object.keys(db.records).filter((id) => id.startsWith(TEMP_PREFIX)).length + Object.keys(db.stabro).filter((id) => id.startsWith(TEMP_PREFIX)).length;
-  const btn = "h-10 rounded-md border border-slate-500 bg-white font-mono text-sm font-bold text-slate-700 disabled:opacity-50";
-  return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-400 bg-slate-200 p-4 text-slate-700">
-      <div className="flex items-center gap-2">
-        <span className="rounded bg-slate-600 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white">DEV</span>
-        <p className="m-0 font-mono text-[13px] font-bold">開発者モード：仮の記録</p>
-      </div>
-      <p className="m-0 font-mono text-[12px] leading-relaxed">スタブロ（開発ボット・岡本一）と、岡本一の 400m・400mH（新人大会）。いま {count} 件</p>
-      <div className="grid grid-cols-2 gap-1.5">
-        <button
-          disabled={busy || count > 0}
-          className={btn}
-          onClick={async () => {
-            setBusy(true);
-            const missing = await addTempData(email);
-            setBusy(false);
-            setMsg(missing.length ? `見つからなかった：${missing.join("、")}` : "入れました");
-          }}
-        >
-          ＋ 入れる
-        </button>
-        <button disabled={busy || count === 0} className={btn} onClick={() => setAsk(true)}>
-          − 消す
-        </button>
-      </div>
-      {msg && <p className="m-0 font-mono text-[12px]">{msg}</p>}
-      {ask && (
-        <Confirm
-          danger
-          title="仮の記録を全部消しますか？"
-          okLabel="消す"
-          onCancel={() => setAsk(false)}
-          onOk={async () => {
-            setAsk(false);
-            setBusy(true);
-            await clearTempData();
-            setBusy(false);
-            setMsg("消しました");
-          }}
-        />
-      )}
-    </section>
   );
 }

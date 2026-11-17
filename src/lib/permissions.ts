@@ -30,7 +30,7 @@ export const canEditProfileOf = (me: Member, targetEmail: string) =>
 export const canEditRecordsOf = (me: Member, targetEmail: string) => me.email === targetEmail || me.role === "manager" || isAdviser(me);
 
 /** 開発者の権限だけで出ている「ほかの人の結果を直す」ボタンを隠す。TODO: コンテストが終わったら false に戻す */
-const HIDE_DEV_RESULT_EDIT = true;
+const HIDE_DEV_RESULT_EDIT = false;
 
 /** ほかの人の結果の編集ボタンを出すか（開発者の権限だけのときは、いまは隠す） */
 export const showResultEditOf = (me: Member, targetEmail: string) =>

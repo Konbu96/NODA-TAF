@@ -1,7 +1,7 @@
 // 「今日の気分は？」を、アプリを開くたびに出す（いまだけ）。
 // ふだんは 1 日 1 回、その日の気分がまだのときだけ出す。
 // TODO: 元に戻すときは MOOD_EVERY_LAUNCH を false にする
-export const MOOD_EVERY_LAUNCH = true;
+export const MOOD_EVERY_LAUNCH = false;
 
 const KEY = "moodAskedThisLaunch";
 

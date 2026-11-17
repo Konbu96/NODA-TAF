@@ -6,12 +6,6 @@
 
 export type AthleteKind = "run" | "hurdle" | "longJump" | "javelin";
 export const ATHLETE_KINDS: AthleteKind[] = ["run", "hurdle", "longJump", "javelin"];
-export const ATHLETE_LABEL: Record<AthleteKind, string> = {
-  run: "走る",
-  hurdle: "ハードル",
-  longJump: "幅跳び",
-  javelin: "やり投げ",
-};
 
 export function Athlete({ kind, month }: { kind: AthleteKind; month: number }) {
   if (kind === "hurdle") return <Hurdler month={month} />;
