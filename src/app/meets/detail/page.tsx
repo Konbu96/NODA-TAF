@@ -9,7 +9,7 @@ import { rangeLabel } from "@/lib/dates";
 import { isMeetOver, isMeetStarted, missingRecords } from "@/lib/derived";
 import { sortMembers } from "@/lib/grade";
 import { ALL_EVENTS, heatLaneParts, windLabel, showMark } from "@/lib/marks";
-import { canEditMenu, hasEvents, isAthlete, showResultEditOf } from "@/lib/permissions";
+import { canEditMenu, isAthlete, showResultEditOf } from "@/lib/permissions";
 import type { DbState, Entry, Meet, Member, RecordDoc } from "@/lib/types";
 
 export default function Page() {
@@ -192,33 +192,6 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
         </div>
       </Card>
 
-      {/* 開発者だけ：大会の前でも後でも、だれのエントリーでも入力・修正できる */}
-      {me.isAdmin && <AdminEntries db={db} meet={meet} today={today} />}
     </>
-  );
-}
-
-/** 開発者用：部員全員のエントリーを一覧にして、名前から直せる（まだの人も入力できる） */
-function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: string }) {
-  const entries = db.entries[meet.id] ?? {};
-  const athletes = sortMembers(
-    Object.values(db.members).filter((m) => m.status === "approved" && hasEvents(m)),
-    today,
-  );
-  return (
-    <Card className="flex flex-col gap-2.5">
-      <Label>エントリーを編集（開発者）</Label>
-      {athletes.map((m, i) => {
-        const q = `id=${meet.id}&member=${encodeURIComponent(m.email)}`;
-        return (
-          <div key={m.email} className={`flex items-start gap-3 text-sm ${i ? "border-t border-divider pt-4" : ""}`}>
-            <Link href={`/meets/entry?${q}`} className="flex min-w-0 grow gap-3">
-              <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
-              {entries[m.email] ? <EntryLines events={sortedEvents(entries[m.email])} entry={entries[m.email]} meet={meet} /> : <span className="text-muted">なし</span>}
-            </Link>
-          </div>
-        );
-      })}
-    </Card>
   );
 }
