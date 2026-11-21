@@ -31,13 +31,12 @@ const sortedEvents = (e: Entry) => [...e.events].sort((a, b) => eventOrder(a) - 
 const entryText = (e: Entry) => sortedEvents(e).join("、");
 
 /** 名前の右に、種目を 1 つずつ。組・レーンと時間は下に分けて、ラベルを付ける。結果があれば種目の右に出す */
-function EntryLines({ events, entry, meet, results, showPlace = true, isMe = false }: {
+function EntryLines({ events, entry, meet, results, isMe = false }: {
   events: string[];
   entry?: Entry;
   meet: Meet;
   /** 大会が始まっていれば、その人の記録（始まっていなければ null） */
   results?: RecordDoc[] | null;
-  showPlace?: boolean;
   isMe?: boolean;
 }) {
   return (
@@ -61,7 +60,7 @@ function EntryLines({ events, entry, meet, results, showPlace = true, isMe = fal
                   <span className={isMe ? "text-warn-dark" : "text-muted"}>未入力</span>
                 ))}
             </div>
-            {showPlace && place.length > 0 && (
+            {place.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {place.map((p) => (
                   <span key={p} className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-[#334155]">
@@ -70,7 +69,7 @@ function EntryLines({ events, entry, meet, results, showPlace = true, isMe = fal
                 ))}
               </div>
             )}
-            {showPlace && (call || start) && (
+            {(call || start) && (
               <div className="flex flex-col gap-1 text-xs">
                 {call && <TimeItem label="招集" time={call} />}
                 {start && <TimeItem label="競技開始" time={start} />}
@@ -168,7 +167,7 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
                   m.name
                 )}
               </span>
-              <EntryLines events={evs} entry={entries[m.email]} meet={meet} results={started ? list : null} showPlace={!over} isMe={m.email === me.email} />
+              <EntryLines events={evs} entry={entries[m.email]} meet={meet} results={started ? list : null} isMe={m.email === me.email} />
             </div>
           );
         })}
