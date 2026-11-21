@@ -10,7 +10,7 @@ import { isMeetOver, isMeetStarted, missingRecords } from "@/lib/derived";
 import { sortMembers } from "@/lib/grade";
 import { ALL_EVENTS, heatLaneParts, windLabel, showMark } from "@/lib/marks";
 import { canEditMenu, hasEvents, isAthlete, showResultEditOf } from "@/lib/permissions";
-import type { DbState, Entry, Meet, Member } from "@/lib/types";
+import type { DbState, Entry, Meet, Member, RecordDoc } from "@/lib/types";
 
 export default function Page() {
   return (
@@ -30,16 +30,38 @@ const sortedEvents = (e: Entry) => [...e.events].sort((a, b) => eventOrder(a) - 
 /** 見出しの「あなた：」には種目名だけ */
 const entryText = (e: Entry) => sortedEvents(e).join("、");
 
-/** 名前の右に、種目を 1 つずつ。組・レーンと時間は下に分けて、ラベルを付ける */
-function EntryLines({ entry, meet }: { entry: Entry; meet: Meet }) {
+/** 名前の右に、種目を 1 つずつ。組・レーンと時間は下に分けて、ラベルを付ける。結果があれば種目の右に出す */
+function EntryLines({ events, entry, meet, results, showPlace = true, isMe = false }: {
+  events: string[];
+  entry?: Entry;
+  meet: Meet;
+  /** 大会が始まっていれば、その人の記録（始まっていなければ null） */
+  results?: RecordDoc[] | null;
+  showPlace?: boolean;
+  isMe?: boolean;
+}) {
   return (
     <div className="flex min-w-0 grow flex-col gap-4 text-[#334155]">
-      {sortedEvents(entry).map((ev) => {
-        const { place, call, start } = heatLaneParts(entry.lanes?.[ev], meet.eventTimes?.[ev]);
+      {events.map((ev) => {
+        const { place, call, start } = heatLaneParts(entry?.lanes?.[ev], meet.eventTimes?.[ev]);
+        const r = results?.find((x) => x.event === ev);
         return (
           <div key={ev} className="flex flex-col gap-1.5">
-            <span className="font-bold">{ev}</span>
-            {place.length > 0 && (
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-bold">{ev}</span>
+              {results &&
+                (r ? (
+                  <span className="flex items-center gap-1 text-[#0f172a]">
+                    {r.isWindAssisted && <RefMark small />}
+                    {showMark(r.mark)}
+                    {r.wind != null && `（${windLabel(r.wind)}）`}
+                    {r.isPB && <PbTag />}
+                  </span>
+                ) : (
+                  <span className={isMe ? "text-warn-dark" : "text-muted"}>未入力</span>
+                ))}
+            </div>
+            {showPlace && place.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {place.map((p) => (
                   <span key={p} className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-[#334155]">
@@ -48,7 +70,7 @@ function EntryLines({ entry, meet }: { entry: Entry; meet: Meet }) {
                 ))}
               </div>
             )}
-            {(call || start) && (
+            {showPlace && (call || start) && (
               <div className="flex flex-col gap-1 text-xs">
                 {call && <TimeItem label="招集" time={call} />}
                 {start && <TimeItem label="競技開始" time={start} />}
@@ -94,7 +116,6 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
     [...new Set([...Object.keys(entries), ...records.map((r) => r.memberId)])].map((e) => db.members[e]).filter(Boolean),
     today,
   );
-  const entrants = people.filter((m) => entries[m.email]);
   const byOrder = (a: string, b: string) => eventOrder(a) - eventOrder(b);
   const mine = entries[me.email];
   const missing = missingRecords(db, meet, me.email, today);
@@ -118,83 +139,58 @@ function Body({ db, me, today, meet }: { db: DbState; me: Member; today: string;
         )}
       </Card>
 
-      {!over && (
-        <Card className="flex flex-col gap-2.5">
-          <div className="flex items-baseline justify-between">
-            <Label>エントリー（{Object.keys(entries).length}人）</Label>
-            {mine && <p className="m-0 text-xs font-bold text-ok">あなた：{entryText(mine)}</p>}
-          </div>
-          {entrants.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
-          {entrants.map((m, i) => (
+      {/* エントリーと結果をひとつの欄に。大会が始まったら、種目の右に記録が出る */}
+      <Card className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-2">
+          <Label className="grow">
+            {started ? "エントリー・結果" : "エントリー"}（{people.length}人）
+          </Label>
+          {/* マネージャー・顧問などは、全員の記録をまとめて直せる */}
+          {started && people.some((m) => m.email !== me.email && showResultEditOf(me, m.email)) && (
+            <EditButton small href={`/meets/results?id=${meet.id}`} label="結果をまとめて編集" ariaLabel="みんなの記録をまとめて編集" />
+          )}
+        </div>
+        {mine && <p className="m-0 text-xs font-bold text-ok">あなた：{entryText(mine)}</p>}
+        {people.length === 0 && <p className="m-0 text-sm text-muted">まだいません</p>}
+        {people.map((m, i) => {
+          const list = records.filter((r) => r.memberId === m.email);
+          const evs = [...new Set([...(entries[m.email]?.events ?? []), ...list.map((r) => r.event)])].sort(byOrder);
+          return (
             <div key={m.email} className={`flex gap-3 text-sm ${i ? "border-t border-divider pt-4" : ""}`}>
               <span className="w-24 shrink-0 font-bold">
                 {editor ? (
                   <Link href={`/meets/entry?id=${meet.id}&member=${encodeURIComponent(m.email)}`} className="underline decoration-line">
-                    {m.name}
+                    {m.email === me.email ? "あなた" : m.name}
                   </Link>
+                ) : m.email === me.email ? (
+                  "あなた"
                 ) : (
                   m.name
                 )}
               </span>
-              <EntryLines entry={entries[m.email]} meet={meet} />
+              <EntryLines events={evs} entry={entries[m.email]} meet={meet} results={started ? list : null} showPlace={!over} isMe={m.email === me.email} />
             </div>
-          ))}
-          {isAthlete(me) && me.role !== "manager" && (
+          );
+        })}
+
+        {/* ボタンは、することごとに分ける */}
+        <div className="mt-1 flex flex-col gap-2.5">
+          {started && mine && (
+            <PrimaryLink href={`/meets/entry?id=${meet.id}`}>{missing.length || !records.some((r) => r.memberId === me.email) ? "自分の記録を入力する" : "自分の記録を直す"}</PrimaryLink>
+          )}
+          {!over && isAthlete(me) && me.role !== "manager" && (
             <Link href={`/meets/entry?id=${meet.id}`} className="flex h-12 items-center justify-center rounded-xl border-2 border-accent bg-white text-[15px] font-bold text-accent">
-              {mine ? "自分のエントリー・組・記録を直す" : "自分のエントリーを入力"}
+              {mine ? "自分のエントリー・組を直す" : "自分のエントリーを入力"}
             </Link>
           )}
           {/* 種目ごとの招集・競技開始の時間を、全部の種目まとめて入れる */}
-          {(mine || editor) && Object.keys(entries).length > 0 && (
+          {!over && (mine || editor) && Object.keys(entries).length > 0 && (
             <Link href={`/meets/times?id=${meet.id}`} className="flex h-12 items-center justify-center rounded-xl border-2 border-accent bg-white text-[15px] font-bold text-accent">
               種目の時間を入力
             </Link>
           )}
-        </Card>
-      )}
-
-      {started && (
-        <Card className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-2">
-            <Label className="grow">結果</Label>
-            {/* マネージャー・顧問などは、全員の記録をまとめて直せる */}
-            {people.some((m) => m.email !== me.email && showResultEditOf(me, m.email)) && (
-              <EditButton small href={`/meets/results?id=${meet.id}`} label="まとめて編集" ariaLabel="みんなの記録をまとめて編集" />
-            )}
-          </div>
-          {people.length === 0 && <p className="m-0 text-sm text-muted">記録はまだありません</p>}
-          {people.map((m) => {
-            const list = records.filter((r) => r.memberId === m.email);
-            const evs = [...new Set([...(entries[m.email]?.events ?? []), ...list.map((r) => r.event)])].sort(byOrder);
-            return (
-              <div key={m.email}>
-                <p className="mt-0 mb-1 flex items-center gap-2 text-[13px] font-bold">
-                  <span className="grow">{m.email === me.email ? "あなた" : m.name}</span>
-                </p>
-                {evs.map((ev) => {
-                  const r = list.find((x) => x.event === ev);
-                  return (
-                    <div key={ev} className={`flex justify-between py-1 pl-2 text-sm ${r ? "" : m.email === me.email ? "text-warn-dark" : "text-muted"}`}>
-                      <span>{ev}</span>
-                      {r ? (
-                        <span className="flex items-center gap-1">
-                          {r.isWindAssisted && <RefMark small />}
-                          {showMark(r.mark)}
-                          {r.wind != null && `（${windLabel(r.wind)}）`}
-                          {r.isPB && <PbTag />}
-                        </span>
-                      ) : (
-                        <span>未入力</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-          {mine && <PrimaryLink href={`/meets/entry?id=${meet.id}`}>{missing.length || !records.some((r) => r.memberId === me.email) ? "自分の記録を入力する" : "自分の記録を直す"}</PrimaryLink>}
-        </Card>
-      )}
+        </div>
+      </Card>
 
       {/* 開発者だけ：大会の前でも後でも、だれのエントリーでも入力・修正できる */}
       {me.isAdmin && <AdminEntries db={db} meet={meet} today={today} />}
@@ -218,7 +214,7 @@ function AdminEntries({ db, meet, today }: { db: DbState; meet: Meet; today: str
           <div key={m.email} className={`flex items-start gap-3 text-sm ${i ? "border-t border-divider pt-4" : ""}`}>
             <Link href={`/meets/entry?${q}`} className="flex min-w-0 grow gap-3">
               <span className="w-24 shrink-0 font-bold underline decoration-line">{m.name}</span>
-              {entries[m.email] ? <EntryLines entry={entries[m.email]} meet={meet} /> : <span className="text-muted">なし</span>}
+              {entries[m.email] ? <EntryLines events={sortedEvents(entries[m.email])} entry={entries[m.email]} meet={meet} /> : <span className="text-muted">なし</span>}
             </Link>
           </div>
         );
