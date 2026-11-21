@@ -90,12 +90,17 @@ export type Meet = {
   endDate: string;
   venue: string;
   guidelineUrl: string;
+  /** 種目ごとの招集開始・競技開始の時間（出る人全員で同じ） */
+  eventTimes?: Record<string, EventTime>;
   updatedBy: string;
   updatedAt: string;
 };
 
-/** 種目ごとの組・レーン（わかっていれば。どちらかだけでもいい） */
-/** 組・レーン。跳躍はピット（A・B）で分かれる。フィールド競技は試技順もある。時間は "09:30" の形 */
+/** 時間は "09:30" の形 */
+export type EventTime = { callTime?: string; startTime?: string };
+
+/** 組・レーン。跳躍はピット（A・B）で分かれる。フィールド競技は試技順もある。
+ *  callTime・startTime は前の形の残り（いまは Meet.eventTimes に種目ごとに持つ） */
 export type HeatLane = { heat?: number; lane?: number; pit?: string; order?: number; callTime?: string; startTime?: string };
 export type Entry = { events: string[]; lanes?: Record<string, HeatLane>; updatedBy: string; updatedAt: string };
 

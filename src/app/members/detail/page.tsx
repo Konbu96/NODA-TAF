@@ -137,7 +137,7 @@ function Body({ db, me, today, target }: { db: DbState; me: Member; today: strin
                   {dateLabel(g)} {g.name}
                 </span>
                 {canRecords && (
-                  <EditButton small href={`/records/edit?meet=${g.meetIds[0]}&member=${encodeURIComponent(target.email)}`} ariaLabel={`${g.name}の記録を編集`} />
+                  <EditButton small href={`/meets/entry?id=${g.meetIds[0]}&member=${encodeURIComponent(target.email)}`} ariaLabel={`${g.name}の記録を編集`} />
                 )}
               </p>
               {g.list.map((r) => (

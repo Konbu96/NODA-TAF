@@ -106,6 +106,10 @@ service cloud.firestore {
     match /meets/{id} {
       allow read: if approved();
       allow write: if menuEditor();
+      // 種目ごとの招集・競技開始の時間は、その大会にエントリーした部員も直せる（ほかの項目は変えられない）
+      allow update: if approved()
+        && exists(/databases/$(database)/documents/meets/$(id)/entries/$(myEmail()))
+        && changesOnly(['eventTimes']);
 
       match /entries/{email} {
         allow write: if menuEditor() || (approved() && isSelf(email));

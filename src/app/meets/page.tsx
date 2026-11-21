@@ -73,7 +73,7 @@ function Body({ db, me, today }: { db: DbState; me: Member; today: string }) {
       {waiting.map((m) => {
         const miss = missingRecords(db, m, me.email, today);
         return (
-          <Link key={m.id} href={`/records/edit?meet=${m.id}`} className="flex items-center gap-3 rounded-xl border-2 border-warn bg-warn-soft px-4 py-3">
+          <Link key={m.id} href={`/meets/entry?id=${m.id}`} className="flex items-center gap-3 rounded-xl border-2 border-warn bg-warn-soft px-4 py-3">
             <div className="w-12 shrink-0 text-center">
               <p className="m-0 text-[11px] text-warn-dark">{monthOf(m.startDate)}月</p>
               <p className="m-0 text-[22px] leading-[1.1] font-bold text-warn-dark">{dayOf(m.startDate)}</p>

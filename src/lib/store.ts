@@ -9,7 +9,7 @@ import { bestFor, recomputeAllPBs } from "./pb";
 import { createSeed } from "./seed";
 import { WARM_UP_DETAILS } from "./warmUpSeed";
 import type {
-  DbState, Fees, Meet, Member, MoodKind, PracticeMenu, PracticeOptions, RecordDoc, Role, StabroDistance, HeatLane } from "./types";
+  DbState, Fees, Meet, Member, MoodKind, PracticeMenu, PracticeOptions, RecordDoc, Role, StabroDistance, HeatLane, EventTime } from "./types";
 
 /*
  * データ置き場。画面からは useStore() で全体を読み、下の actions で書き込む（どれも Promise を返す）。
@@ -471,11 +471,33 @@ export function saveMeet(meet: Omit<Meet, "updatedAt" | "updatedBy">, by: string
   const id = meet.id || `m${Date.now().toString(36)}`;
   update((s) => ({
     ...s,
-    meets: { ...s.meets, [id]: { ...meet, id, updatedBy: by, updatedAt: nowIso() } },
+    // 種目ごとの時間は別の画面で入れるので、そのまま残す
+    meets: { ...s.meets, [id]: { ...keepTimes(s.meets[id]), ...meet, id, updatedBy: by, updatedAt: nowIso() } },
     records: Object.fromEntries(Object.entries(s.records).map(([k, r]) =>
       [k, r.meetId === id ? { ...r, meetName: meet.name, date: meet.startDate } : r])),
   }));
   return lastWrite.then(() => id);
+}
+
+const keepTimes = (m?: Meet) => (m?.eventTimes ? { eventTimes: m.eventTimes } : {});
+
+/** 種目ごとの招集開始・競技開始の時間をまとめて保存する（空の時間は入れない） */
+export function saveEventTimes(meetId: string, times: Record<string, EventTime>) {
+  const kept: Record<string, EventTime> = {};
+  for (const [ev, t] of Object.entries(times)) {
+    const v: EventTime = {};
+    if (t.callTime) v.callTime = t.callTime;
+    if (t.startTime) v.startTime = t.startTime;
+    if (Object.keys(v).length) kept[ev] = v;
+  }
+  update((s) => {
+    const m = s.meets[meetId];
+    if (!m) return s;
+    const rest = { ...m };
+    delete rest.eventTimes;
+    return { ...s, meets: { ...s.meets, [meetId]: { ...rest, ...(Object.keys(kept).length ? { eventTimes: kept } : {}) } } };
+  });
+  return done();
 }
 
 export function deleteMeet(id: string) {
@@ -519,40 +541,7 @@ export function saveEntry(meetId: string, email: string, events: string[], by: s
   return done();
 }
 
-/** 組・レーンだけを入れ直す（組み分けが出たあとに入力する） */
-export function saveLanes(meetId: string, email: string, lanes: Record<string, HeatLane>, by: string) {
-  update((s) => {
-    const list = { ...(s.entries[meetId] ?? {}) };
-    const e = list[email];
-    if (!e) return s;
-    const kept = keepLanes(e.events, lanes);
-    const rest = { ...e };
-    delete rest.lanes;
-    list[email] = { ...rest, ...(Object.keys(kept).length ? { lanes: kept } : {}), updatedBy: by, updatedAt: nowIso() };
-    return { ...s, entries: { ...s.entries, [meetId]: list } };
-  });
-  return done();
-}
 
-/** 何人分ものエントリー（種目と組・レーン・時間）をまとめて保存する。種目が空の人はエントリーを消す。変わった人だけ書きかえる */
-export function saveEntries(meetId: string, all: Record<string, { events: string[]; lanes: Record<string, HeatLane> }>, by: string) {
-  update((s) => {
-    const list = { ...(s.entries[meetId] ?? {}) };
-    for (const [email, { events, lanes }] of Object.entries(all)) {
-      const old = list[email];
-      if (!events.length) {
-        delete list[email];
-        continue;
-      }
-      const kept = keepLanes(events, lanes);
-      const next = { events, ...(Object.keys(kept).length ? { lanes: kept } : {}) };
-      const same = old && JSON.stringify([[...old.events].sort(), old.lanes ?? {}]) === JSON.stringify([[...events].sort(), next.lanes ?? {}]);
-      if (!same) list[email] = { ...next, updatedBy: by, updatedAt: nowIso() };
-    }
-    return { ...s, entries: { ...s.entries, [meetId]: list } };
-  });
-  return done();
-}
 
 // ---------- 振り返り・気分・スタブロ ----------
 
